@@ -514,24 +514,29 @@ img.leaflet-tile { image-rendering: auto; }
 
   .sidebar {
     position: fixed; left: 0; top: 0; right: 0;
-    bottom: 56px; /* room for tab bar */
+    bottom: 0;
     z-index: 1500; width: 100%; min-width: unset;
     transform: translateX(-100%);
     transition: transform 0.25s ease;
+    /* Add padding at bottom for tab bar so content isn't hidden behind it */
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
   }
 
   .sidebar.mobile-visible {
     transform: translateX(0);
   }
 
+  /* Ensure trail list takes remaining space so bottom items don't overflow */
+  .trail-list { flex: 1; min-height: 60px; }
+
   /* Map fills screen above tab bar */
-  #map { position: fixed; top: 0; left: 0; right: 0; bottom: 56px; }
+  #map { position: fixed; top: 0; left: 0; right: 0; bottom: 0; }
 
   /* Map controls */
   .map-controls { top: 12px; right: 12px; }
 
-  /* Detail panel above tab bar */
-  .detail-panel { bottom: 56px; }
+  /* Detail panel */
+  .detail-panel { bottom: 0; padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
 
   /* Larger tap targets everywhere */
   .chip { font-size: 13px; padding: 8px 14px; }
@@ -572,7 +577,7 @@ img.leaflet-tile { image-rendering: auto; }
   /* Detail panel */
   .detail-header { padding: 20px 16px; }
   .detail-header h2 { font-size: 22px; }
-  .detail-body { padding: 16px; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+  .detail-body { padding: 16px; padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   .detail-actions button { width: 40px; height: 40px; font-size: 18px; border-radius: 10px; }
   .detail-stat { padding: 12px 14px; }
   .detail-stat .value { font-size: 16px; }
@@ -605,7 +610,7 @@ img.leaflet-tile { image-rendering: auto; }
   .token-banner-dismiss { width: 32px; height: 32px; font-size: 16px; }
 
   /* Filter badge above tab bar */
-  .filter-badge { bottom: 72px; font-size: 13px; padding: 8px 18px; }
+  .filter-badge { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); font-size: 13px; padding: 8px 18px; }
 
   /* Adjust tab bar bottom for safe area */
   .mobile-tabs {
