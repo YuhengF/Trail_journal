@@ -138,16 +138,29 @@ body {
 .trail-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
 .trail-card-wrapper {
-  position: relative;
   overflow: hidden;
   border-radius: var(--radius);
   margin-bottom: 4px;
 }
 
+.trail-card-inner {
+  display: flex;
+  transition: transform 0.25s ease;
+}
+
+.trail-card {
+  flex: 0 0 100%;
+  padding: 12px 14px; border-radius: var(--radius);
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: var(--bg-panel);
+}
+
+.trail-card:hover { background: var(--bg-hover); }
+.trail-card.selected { background: var(--bg-card); border-color: var(--border); box-shadow: var(--shadow); }
+
 .trail-card-delete {
-  position: absolute;
-  right: 0; top: 0; bottom: 0;
-  width: 72px;
+  flex: 0 0 76px;
   background: #d63031;
   color: #fff;
   display: flex;
@@ -158,20 +171,8 @@ body {
   font-family: inherit;
   border: none;
   cursor: pointer;
-  border-radius: 0 var(--radius) var(--radius) 0;
+  border-radius: var(--radius);
 }
-
-.trail-card {
-  position: relative;
-  padding: 12px 14px; border-radius: var(--radius);
-  cursor: pointer; transition: transform 0.2s ease, background 0.15s;
-  border: 1px solid transparent;
-  background: var(--bg-panel);
-  z-index: 1;
-}
-
-.trail-card:hover { background: var(--bg-hover); }
-.trail-card.selected { background: var(--bg-card); border-color: var(--border); box-shadow: var(--shadow); }
 
 .trail-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
 .trail-name { font-size: 14px; font-weight: 500; line-height: 1.3; }
@@ -1178,10 +1179,19 @@ let map, trailLayers = {}, tileLayers = {}, currentTileLayer = null;
 
 function initMap() {
   map = L.map('map', { zoomControl: true }).setView([37.87, -122.27], 10);
-  const tileOpts = { attribution: '&copy; OpenStreetMap', maxZoom: 19 };
-  tileLayers.streets = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', tileOpts);
-  tileLayers.muted = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', tileOpts);
-  tileLayers.dark = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', tileOpts);
+
+  // Detect retina/high-DPI display
+  const isRetina = window.devicePixelRatio > 1;
+  // CartoDB serves @2x tiles for retina; OSM only has 1x
+  const baseUrl = isRetina
+    ? 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png'
+    : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+  const attr = isRetina ? '&copy; OSM &amp; CARTO' : '&copy; OpenStreetMap';
+  const tileOpts = { attribution: attr, maxZoom: 19, subdomains: 'abcd' };
+
+  tileLayers.streets = L.tileLayer(baseUrl, tileOpts);
+  tileLayers.muted = L.tileLayer(baseUrl, tileOpts);
+  tileLayers.dark = L.tileLayer(baseUrl, tileOpts);
   tileLayers.streets.addTo(map);
   currentTileLayer = 'streets';
   Object.values(tileLayers).forEach(layer => {
@@ -1290,16 +1300,18 @@ function renderList() {
     : filtered.map(t => {
       const color = getTrailColor(trails.indexOf(t));
       return `<div class="trail-card-wrapper" data-trail-id="${t.id}">
-        <button class="trail-card-delete" onclick="swipeDelete('${t.id}')">Delete</button>
-        <div class="trail-card ${selectedId===t.id?'selected':''}" onclick="openDetailGuarded('${t.id}')">
-        <div class="trail-card-header">
-          <span class="trail-name"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:6px;vertical-align:middle;"></span>${t.name}</span>
-          <span class="trail-status ${t.status}">${t.status==='wishlist'?'★ Wishlist':'✓ Done'}</span>
+        <div class="trail-card-inner">
+          <div class="trail-card ${selectedId===t.id?'selected':''}" onclick="openDetailGuarded('${t.id}')">
+            <div class="trail-card-header">
+              <span class="trail-name"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:6px;vertical-align:middle;"></span>${t.name}</span>
+              <span class="trail-status ${t.status}">${t.status==='wishlist'?'★ Wishlist':'✓ Done'}</span>
+            </div>
+            <div class="trail-meta">${t.date?`<span>${t.date}</span>`:''}${t.distance?`<span>${t.distance} mi</span>`:''}${t.elevation?`<span>${t.elevation} ft ↑</span>`:''}${t.duration?`<span>${t.duration}</span>`:''}${t.difficulty?`<span>${t.difficulty}</span>`:''}</div>
+            ${t.rating?`<div class="trail-rating">${'★'.repeat(t.rating)}${'☆'.repeat(5-t.rating)}</div>`:''}
+            ${(t.tags&&t.tags.length)?`<div class="trail-tags">${t.tags.map(tg=>`<span class="trail-tag">${tg}</span>`).join('')}</div>`:''}
+          </div>
+          <button class="trail-card-delete" onclick="swipeDelete('${t.id}')">Delete</button>
         </div>
-        <div class="trail-meta">${t.date?`<span>${t.date}</span>`:''}${t.distance?`<span>${t.distance} mi</span>`:''}${t.elevation?`<span>${t.elevation} ft ↑</span>`:''}${t.duration?`<span>${t.duration}</span>`:''}${t.difficulty?`<span>${t.difficulty}</span>`:''}</div>
-        ${t.rating?`<div class="trail-rating">${'★'.repeat(t.rating)}${'☆'.repeat(5-t.rating)}</div>`:''}
-        ${(t.tags&&t.tags.length)?`<div class="trail-tags">${t.tags.map(tg=>`<span class="trail-tag">${tg}</span>`).join('')}</div>`:''}
-      </div>
       </div>`;
     }).join('');
   updateStats();
@@ -1512,7 +1524,7 @@ function importData(e) {
 
 // ===== SWIPE TO DELETE =====
 let activeSwipe = null;
-let swipeLock = false; // prevents click from firing after swipe
+let swipeLock = false;
 
 function swipeDelete(id) {
   addTombstone(id);
@@ -1522,9 +1534,7 @@ function swipeDelete(id) {
 }
 
 function openDetailGuarded(id) {
-  // Don't open detail if we just swiped
   if (swipeLock) return;
-  // If a card is swiped open, close it instead
   if (activeSwipe) {
     activeSwipe.style.transform = 'translateX(0)';
     activeSwipe = null;
@@ -1535,11 +1545,13 @@ function openDetailGuarded(id) {
 
 function initSwipeHandlers() {
   document.querySelectorAll('.trail-card-wrapper').forEach(wrapper => {
-    const card = wrapper.querySelector('.trail-card');
+    const inner = wrapper.querySelector('.trail-card-inner');
+    if (!inner) return;
     let startX = 0, startY = 0, currentX = 0, swiping = false;
 
-    card.addEventListener('touchstart', (e) => {
-      if (activeSwipe && activeSwipe !== card) {
+    inner.addEventListener('touchstart', (e) => {
+      // Close any other open swipe
+      if (activeSwipe && activeSwipe !== inner) {
         activeSwipe.style.transform = 'translateX(0)';
         activeSwipe = null;
       }
@@ -1548,35 +1560,32 @@ function initSwipeHandlers() {
       currentX = startX;
       swiping = false;
       swipeLock = false;
-      card.style.transition = 'none';
+      inner.style.transition = 'none';
     }, { passive: true });
 
-    card.addEventListener('touchmove', (e) => {
+    inner.addEventListener('touchmove', (e) => {
       currentX = e.touches[0].clientX;
       const dx = currentX - startX;
       const dy = e.touches[0].clientY - startY;
-      // Only horizontal swipe left, ignore vertical scroll
-      if (Math.abs(dx) > Math.abs(dy) && dx < -8) {
+      if (Math.abs(dx) > Math.abs(dy) + 5 && dx < -5) {
         swiping = true;
-        card.style.transform = `translateX(${Math.max(dx, -80)}px)`;
+        inner.style.transform = `translateX(${Math.max(dx, -76)}px)`;
       }
     }, { passive: true });
 
-    card.addEventListener('touchend', () => {
-      card.style.transition = 'transform 0.2s ease';
+    inner.addEventListener('touchend', () => {
+      inner.style.transition = 'transform 0.25s ease';
       const dx = currentX - startX;
       if (swiping && dx < -35) {
-        card.style.transform = 'translateX(-72px)';
-        activeSwipe = card;
+        inner.style.transform = 'translateX(-76px)';
+        activeSwipe = inner;
+      } else {
+        inner.style.transform = 'translateX(0)';
+        if (activeSwipe === inner) activeSwipe = null;
+      }
+      if (swiping) {
         swipeLock = true;
         setTimeout(() => { swipeLock = false; }, 300);
-      } else {
-        card.style.transform = 'translateX(0)';
-        if (activeSwipe === card) activeSwipe = null;
-        if (swiping) {
-          swipeLock = true;
-          setTimeout(() => { swipeLock = false; }, 300);
-        }
       }
     });
   });
