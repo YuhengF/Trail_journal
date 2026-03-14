@@ -785,6 +785,147 @@ img.leaflet-tile { image-rendering: auto; }
     padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* ===== TAG FILTER SYSTEM ===== */
+.tag-filter-row {
+  display: flex; align-items: center; gap: 6px;
+  flex-wrap: wrap;
+}
+.tag-filter-row:empty { display: none; }
+
+.tag-filter-btn {
+  font-size: 11px; padding: 4px 10px; border-radius: 20px;
+  border: 1px solid var(--border); background: none;
+  color: var(--text-dim); cursor: pointer; font-family: inherit;
+  transition: all 0.15s; display: inline-flex; align-items: center; gap: 3px;
+  white-space: nowrap;
+}
+.tag-filter-btn:hover { border-color: var(--text-muted); background: var(--bg-hover); }
+.tag-filter-btn.has-active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 500; }
+
+.top-tag-chip {
+  font-size: 10.5px; padding: 3px 8px; border-radius: 14px;
+  border: 1px solid var(--border-light); background: var(--bg-input);
+  color: var(--text-dim); cursor: pointer; font-family: inherit;
+  transition: all 0.15s; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 3px;
+}
+.top-tag-chip:hover { border-color: var(--text-muted); background: var(--bg-hover); }
+.top-tag-chip.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 500; }
+.top-tag-count { font-size: 9px; opacity: 0.55; font-family: 'JetBrains Mono', monospace; }
+
+.active-tag-filters { display: flex; flex-wrap: wrap; gap: 4px; width: 100%; }
+
+.active-tag-pill {
+  font-size: 10px; padding: 2px 6px 2px 8px; border-radius: 10px;
+  background: var(--accent-soft); border: 1px solid rgba(199,98,58,0.3);
+  color: var(--accent); font-family: inherit; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 3px;
+  font-weight: 500; transition: all 0.15s; white-space: nowrap;
+}
+.active-tag-pill:hover { background: var(--accent); color: #fff; }
+.active-tag-pill .pill-x { font-size: 11px; line-height: 1; }
+
+.clear-tags-btn {
+  font-size: 10px; padding: 2px 8px; border-radius: 10px;
+  background: none; border: 1px solid var(--border);
+  color: var(--text-muted); font-family: inherit; cursor: pointer;
+  transition: all 0.15s; white-space: nowrap;
+}
+.clear-tags-btn:hover { border-color: var(--text-muted); color: var(--text-dim); }
+
+/* TAG PANEL OVERLAY */
+.tag-panel-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.25);
+  z-index: 3000;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity 0.2s;
+  backdrop-filter: none;
+}
+.tag-panel-overlay.open { opacity: 1; pointer-events: auto; backdrop-filter: blur(4px); }
+
+.tag-panel {
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 14px; width: 460px; max-width: 95vw;
+  max-height: 80vh; display: flex; flex-direction: column;
+  box-shadow: var(--shadow-lg);
+}
+.tag-panel-header {
+  padding: 18px 20px 0; display: flex;
+  justify-content: space-between; align-items: center;
+  flex-shrink: 0;
+}
+.tag-panel-header h2 {
+  font-family: 'DM Serif Display', serif; font-size: 17px; font-weight: 400;
+}
+.tag-panel-body {
+  padding: 14px 20px 20px; overflow-y: auto; flex: 1;
+}
+.tag-panel-body::-webkit-scrollbar { width: 5px; }
+.tag-panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+.tag-panel-empty {
+  text-align: center; padding: 24px 16px; color: var(--text-muted);
+  font-size: 13px; line-height: 1.6;
+}
+
+.tag-category { margin-bottom: 16px; }
+.tag-category:last-child { margin-bottom: 0; }
+
+.tag-category-title {
+  font-size: 10px; color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: 1px; margin-bottom: 8px; font-weight: 500;
+}
+.tag-category-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.tag-chip {
+  font-size: 11.5px; padding: 5px 11px; border-radius: 14px;
+  border: 1px solid var(--border-light); background: var(--bg-input);
+  color: var(--text-dim); cursor: pointer; font-family: inherit;
+  transition: all 0.15s; display: inline-flex; align-items: center; gap: 5px;
+  white-space: nowrap;
+}
+.tag-chip:hover { border-color: var(--text-muted); background: var(--bg-hover); }
+.tag-chip.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 500; }
+.tag-chip-count { font-size: 9px; opacity: 0.5; font-family: 'JetBrains Mono', monospace; }
+.tag-chip.active .tag-chip-count { opacity: 0.8; }
+
+.tag-panel-footer {
+  padding: 0 20px 16px; display: flex; gap: 8px; flex-shrink: 0;
+}
+.tag-panel-footer .btn { flex: 1; }
+
+/* MODAL TAG PICKER */
+.modal-tag-picker { margin-top: 8px; }
+.modal-tag-picker-label {
+  font-size: 10px; color: var(--text-muted); margin-bottom: 6px;
+}
+.modal-tag-picker-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+
+.modal-tag-chip {
+  font-size: 11px; padding: 3px 9px; border-radius: 12px;
+  border: 1px solid var(--border-light); background: var(--bg-input);
+  color: var(--text-dim); cursor: pointer; font-family: inherit;
+  transition: all 0.15s; white-space: nowrap;
+}
+.modal-tag-chip:hover { border-color: var(--text-muted); background: var(--bg-hover); }
+.modal-tag-chip.selected { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 500; }
+
+/* CLICKABLE TAGS */
+.trail-tag.clickable { cursor: pointer; transition: all 0.15s; user-select: none; }
+.trail-tag.clickable:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+@media (max-width: 800px) {
+  .tag-filter-row { gap: 4px; }
+  .tag-filter-btn { font-size: 12px; padding: 6px 11px; }
+  .top-tag-chip { font-size: 11px; padding: 5px 10px; }
+  .active-tag-pill { font-size: 11px; padding: 3px 7px 3px 9px; }
+  .tag-panel { border-radius: 16px 16px 0 0; max-height: 85vh; margin-top: auto; }
+  .tag-panel-header { padding: 16px 18px 0; }
+  .tag-panel-body { padding: 12px 18px 18px; }
+  .tag-chip { font-size: 12.5px; padding: 7px 13px; }
+  .modal-tag-chip { font-size: 12px; padding: 5px 11px; }
+}
 </style>
 </head>
 <body>
@@ -819,6 +960,7 @@ img.leaflet-tile { image-rendering: auto; }
         <button class="chip" data-filter="wishlist">★ Wishlist</button>
         <button class="chip" data-filter="5star">5★ Only</button>
       </div>
+      <div class="tag-filter-row" id="tagFilterRow"></div>
     </div>
 
     <div class="trail-list" id="trailList"></div>
@@ -900,6 +1042,21 @@ img.leaflet-tile { image-rendering: auto; }
   <div class="detail-body" id="detailBody"></div>
 </div>
 
+<!-- TAG PANEL -->
+<div class="tag-panel-overlay" id="tagPanelOverlay" onclick="closeTagPanel(event)">
+  <div class="tag-panel" onclick="event.stopPropagation()">
+    <div class="tag-panel-header">
+      <h2>🏷 All Tags</h2>
+      <button class="modal-close" onclick="closeTagPanel()">×</button>
+    </div>
+    <div class="tag-panel-body" id="tagPanelBody"></div>
+    <div class="tag-panel-footer" id="tagPanelFooter" style="display:none">
+      <button class="btn" onclick="clearTagFilters();closeTagPanel()">Clear Filters</button>
+      <button class="btn primary" onclick="closeTagPanel()">Done</button>
+    </div>
+  </div>
+</div>
+
 <!-- ADD/EDIT MODAL -->
 <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
   <div class="modal" onclick="event.stopPropagation()">
@@ -927,7 +1084,11 @@ img.leaflet-tile { image-rendering: auto; }
         <div class="form-group"><label>Difficulty</label><select id="fDifficulty"><option value="">—</option><option value="easy">Easy</option><option value="moderate">Moderate</option><option value="hard">Hard</option><option value="strenuous">Strenuous</option></select></div>
         <div class="form-group"><label>Enjoyment (1-5)</label><div class="star-input" id="starInput"><span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span><span data-v="4">★</span><span data-v="5">★</span></div></div>
       </div>
-      <div class="form-group"><label>Tags (comma-separated)</label><input type="text" id="fTags" placeholder="e.g. coastal, loop, redwoods, dogs-ok"></div>
+      <div class="form-group">
+        <label>Tags (comma-separated)</label>
+        <input type="text" id="fTags" placeholder="e.g. coastal, loop, redwoods, dogs-ok">
+        <div class="modal-tag-picker" id="modalTagPicker"></div>
+      </div>
       <div class="form-group"><label>Weather / Conditions</label><input type="text" id="fWeather" placeholder="e.g. Sunny, 65°F, trail muddy in spots"></div>
       <div class="form-group"><label>Companions</label><input type="text" id="fCompanions" placeholder="e.g. solo, with Alex & Sam"></div>
       <div class="form-group"><label>Notes / Journal</label><textarea id="fNotes" rows="4" placeholder="Your thoughts, highlights, memories..."></textarea></div>
@@ -1038,6 +1199,7 @@ let editingId = null, selectedId = null, currentRating = 0, gpxTrackData = null,
 let trailsVisible = true, focusedTrailId = null, savedMapView = null;
 let syncPending = false;
 let ghSha = null;
+let activeTagFilters = [];
 
 const TRAIL_COLORS = [
   '#e8552e','#2eaa55','#2e88dd','#b044dd','#dd9922',
@@ -1457,12 +1619,179 @@ function getFilteredTrails() {
     if (filter === 'completed' && t.status !== 'completed') return false;
     if (filter === 'wishlist' && t.status !== 'wishlist') return false;
     if (filter === '5star' && t.rating !== 5) return false;
+    if (activeTagFilters.length > 0) {
+      const trailTags = (t.tags || []).map(tg => tg.toLowerCase());
+      if (!activeTagFilters.every(f => trailTags.some(tg => tg === f.toLowerCase()))) return false;
+    }
     if (search) {
       const hay = `${t.name} ${(t.tags||[]).join(' ')} ${t.notes||''} ${t.weather||''} ${t.companions||''} ${t.difficulty||''}`.toLowerCase();
       if (!hay.includes(search)) return false;
     }
     return true;
   });
+}
+
+// ===== TAG SYSTEM =====
+const TAG_KEYWORDS = {
+  'Terrain': ['coastal','mountain','forest','desert','canyon','ridge','meadow','lake','river','waterfall','beach','cliff','alpine','valley','hills','wetland','prairie','woodland','creek','bay','peninsula','island','dunes','gorge','plateau','ocean','sea','peak','summit','swamp','marsh','grove','woods','pond','stream','cove','bluff','mesa'],
+  'Trail Type': ['loop','out-and-back','point-to-point','lollipop','spur','thru-hike','section','scramble','bushwhack','backpacking','day-hike','multi-day','traverse'],
+  'Features': ['redwoods','wildflowers','views','bridge','wildlife','birds','old-growth','hot-springs','cave','arch','ruins','lighthouse','lookout','petroglyphs','scenic','sunset','sunrise','panoramic','historic','waterfall','falls'],
+  'Conditions': ['muddy','icy','snow','dry','rocky','steep','exposed','shady','overgrown','well-maintained','paved','sandy','technical','flat','hilly','windy','foggy','wet','slippery'],
+  'Amenities': ['dogs','kid','camping','parking','restroom','shade','picnic','swimming','permit','free','fee','wheelchair','stroller','accessible','crowded','quiet','popular','remote','family','solo']
+};
+
+function getAllTags() {
+  const tagMap = {};
+  trails.forEach(t => {
+    (t.tags || []).forEach(tag => { tagMap[tag] = (tagMap[tag] || 0) + 1; });
+  });
+  return tagMap;
+}
+
+function getTopTags(n) {
+  return Object.entries(getAllTags()).sort((a, b) => b[1] - a[1]).slice(0, n);
+}
+
+function categorizeTags() {
+  const tagMap = getAllTags();
+  const categories = {};
+  const placed = new Set();
+
+  for (const [cat, keywords] of Object.entries(TAG_KEYWORDS)) {
+    const matched = [];
+    for (const [tag, count] of Object.entries(tagMap)) {
+      if (placed.has(tag)) continue;
+      const lower = tag.toLowerCase();
+      if (keywords.some(kw => lower.includes(kw))) {
+        matched.push({ tag, count });
+        placed.add(tag);
+      }
+    }
+    if (matched.length) {
+      matched.sort((a, b) => b.count - a.count);
+      categories[cat] = matched;
+    }
+  }
+
+  const other = Object.entries(tagMap)
+    .filter(([tag]) => !placed.has(tag))
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count);
+  if (other.length) categories['Other'] = other;
+
+  return categories;
+}
+
+function toggleTagFilter(tag) {
+  const idx = activeTagFilters.indexOf(tag);
+  if (idx >= 0) activeTagFilters.splice(idx, 1);
+  else activeTagFilters.push(tag);
+  renderTagFilterRow();
+  renderList();
+  renderMap();
+  if (document.getElementById('tagPanelOverlay').classList.contains('open')) renderTagPanelBody();
+}
+
+function clearTagFilters() {
+  activeTagFilters = [];
+  renderTagFilterRow();
+  renderList();
+  renderMap();
+}
+
+function escAttr(s) { return s.replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+
+function renderTagFilterRow() {
+  const container = document.getElementById('tagFilterRow');
+  if (!container) return;
+  const allTags = getAllTags();
+  if (Object.keys(allTags).length === 0) { container.innerHTML = ''; return; }
+
+  const topTags = getTopTags(3);
+  const hasActive = activeTagFilters.length > 0;
+  let html = '';
+
+  topTags.forEach(([tag, count]) => {
+    const isActive = activeTagFilters.includes(tag);
+    html += `<button class="top-tag-chip ${isActive ? 'active' : ''}" data-filtertag="${escAttr(tag)}" onclick="toggleTagFilter(this.dataset.filtertag)">${tag}<span class="top-tag-count">${count}</span></button>`;
+  });
+
+  html += `<button class="tag-filter-btn ${hasActive ? 'has-active' : ''}" onclick="openTagPanel()">🏷${hasActive ? ' ' + activeTagFilters.length : ' Tags'}</button>`;
+
+  if (hasActive) {
+    html += `<div class="active-tag-filters">`;
+    activeTagFilters.forEach(tag => {
+      const inTop = topTags.some(([t]) => t === tag);
+      if (!inTop) {
+        html += `<button class="active-tag-pill" data-filtertag="${escAttr(tag)}" onclick="toggleTagFilter(this.dataset.filtertag)">${tag}<span class="pill-x">×</span></button>`;
+      }
+    });
+    html += `<button class="clear-tags-btn" onclick="clearTagFilters()">Clear all</button>`;
+    html += `</div>`;
+  }
+
+  container.innerHTML = html;
+}
+
+function renderTagPanelBody() {
+  const body = document.getElementById('tagPanelBody');
+  const footer = document.getElementById('tagPanelFooter');
+  const categories = categorizeTags();
+
+  if (Object.keys(categories).length === 0) {
+    body.innerHTML = `<div class="tag-panel-empty">No tags yet. Add tags to your trails to see them here.</div>`;
+    footer.style.display = 'none';
+    return;
+  }
+
+  let html = '';
+  for (const [cat, tags] of Object.entries(categories)) {
+    html += `<div class="tag-category"><div class="tag-category-title">${cat}</div><div class="tag-category-chips">`;
+    tags.forEach(({ tag, count }) => {
+      const isActive = activeTagFilters.includes(tag);
+      html += `<button class="tag-chip ${isActive ? 'active' : ''}" data-filtertag="${escAttr(tag)}" onclick="toggleTagFilter(this.dataset.filtertag)">${tag}<span class="tag-chip-count">${count}</span></button>`;
+    });
+    html += `</div></div>`;
+  }
+  body.innerHTML = html;
+  footer.style.display = activeTagFilters.length > 0 ? 'flex' : 'none';
+}
+
+function openTagPanel() {
+  renderTagPanelBody();
+  document.getElementById('tagPanelOverlay').classList.add('open');
+}
+
+function closeTagPanel(e) {
+  if (e && e.target !== e.currentTarget) return;
+  document.getElementById('tagPanelOverlay').classList.remove('open');
+}
+
+function renderModalTagPicker() {
+  const container = document.getElementById('modalTagPicker');
+  if (!container) return;
+  const tagMap = getAllTags();
+  const sortedTags = Object.entries(tagMap).sort((a, b) => b[1] - a[1]);
+  if (sortedTags.length === 0) { container.innerHTML = ''; return; }
+
+  const currentTags = document.getElementById('fTags').value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  let html = `<div class="modal-tag-picker-label">Quick add from existing tags:</div><div class="modal-tag-picker-chips">`;
+  sortedTags.forEach(([tag]) => {
+    const isSelected = currentTags.includes(tag.toLowerCase());
+    html += `<button type="button" class="modal-tag-chip ${isSelected ? 'selected' : ''}" data-modaltag="${escAttr(tag)}" onclick="toggleModalTag(this.dataset.modaltag)">${tag}</button>`;
+  });
+  html += `</div>`;
+  container.innerHTML = html;
+}
+
+function toggleModalTag(tag) {
+  const input = document.getElementById('fTags');
+  let tags = input.value.split(',').map(s => s.trim()).filter(Boolean);
+  const idx = tags.findIndex(t => t.toLowerCase() === tag.toLowerCase());
+  if (idx >= 0) tags.splice(idx, 1);
+  else tags.push(tag);
+  input.value = tags.join(', ');
+  renderModalTagPicker();
 }
 
 // ===== MAP =====
@@ -1548,7 +1877,7 @@ function renderMap() {
   const badge = document.getElementById('filterBadge');
   const activeFilter = document.querySelector('.chip.active, .chip.active-green, .chip.active-wishlist')?.dataset.filter || 'all';
   const searchVal = document.getElementById('searchInput').value.trim();
-  if (activeFilter !== 'all' || searchVal) {
+  if (activeFilter !== 'all' || searchVal || activeTagFilters.length > 0) {
     badge.textContent = `Showing ${filtered.length} of ${trails.length} trails on map`;
     badge.classList.add('visible');
   } else { badge.classList.remove('visible'); }
@@ -1969,13 +2298,14 @@ function renderList() {
             </div>
             <div class="trail-meta">${t.date?`<span>${t.date}</span>`:''}${t.distance?`<span>${t.distance} mi</span>`:''}${t.elevation?`<span>${t.elevation} ft ↑</span>`:''}${t.duration?`<span>${t.duration}</span>`:''}${t.timeRange?`<span>${t.timeRange}</span>`:''}${t.difficulty?`<span>${t.difficulty}</span>`:''}</div>
             ${t.rating?`<div class="trail-rating">${'★'.repeat(t.rating)}${'☆'.repeat(5-t.rating)}</div>`:''}
-            ${(t.tags&&t.tags.length)?`<div class="trail-tags">${t.tags.map(tg=>`<span class="trail-tag">${tg}</span>`).join('')}</div>`:''}
+            ${(t.tags&&t.tags.length)?`<div class="trail-tags">${t.tags.map(tg=>`<span class="trail-tag clickable" data-filtertag="${escAttr(tg)}" onclick="event.stopPropagation();toggleTagFilter(this.dataset.filtertag)">${tg}</span>`).join('')}</div>`:''}
           </div>
           <button class="trail-card-delete" onclick="swipeDelete('${t.id}')">Delete</button>
         </div>
       </div>`;
     }).join('');
   updateStats();
+  renderTagFilterRow();
   // Attach swipe handlers after rendering
   initSwipeHandlers();
 }
@@ -2017,6 +2347,7 @@ function openAddModal() {
   document.getElementById('modalOverlay').classList.add('open');
   document.getElementById('gpxDrop').innerHTML = `<div>📂 Drop a GPX file here or click to import</div><div style="font-size:10px;margin-top:4px;color:var(--text-muted)">Auto-fills track, distance & elevation</div><input type="file" id="gpxFile" accept=".gpx">`;
   bindGpxInput();
+  renderModalTagPicker();
   if (window.innerWidth <= 800) document.getElementById('sidebar').classList.remove('mobile-visible');
 }
 
@@ -2044,6 +2375,7 @@ function openEditModal(id) {
     : `<div>📂 Drop a GPX file here or click to import</div><div style="font-size:10px;margin-top:4px;color:var(--text-muted)">Auto-fills track, distance & elevation</div><input type="file" id="gpxFile" accept=".gpx">`;
   bindGpxInput();
   document.getElementById('modalOverlay').classList.add('open');
+  renderModalTagPicker();
 }
 
 function closeModal(e) {
@@ -2165,7 +2497,7 @@ function openDetail(id) {
   if (t.weather) h+=`<div class="detail-stat"><div class="label">Weather</div><div class="value" style="font-family:'DM Sans';font-size:12px">${t.weather}</div></div>`;
   h += `</div>`;
   if (t.companions) h+=`<div class="detail-section"><h3>Companions</h3><p>${t.companions}</p></div>`;
-  if (t.tags&&t.tags.length) h+=`<div class="detail-section"><h3>Tags</h3><div class="detail-tags">${t.tags.map(tg=>`<span class="trail-tag">${tg}</span>`).join('')}</div></div>`;
+  if (t.tags&&t.tags.length) h+=`<div class="detail-section"><h3>Tags</h3><div class="detail-tags">${t.tags.map(tg=>`<span class="trail-tag clickable" data-filtertag="${escAttr(tg)}" onclick="toggleTagFilter(this.dataset.filtertag)">${tg}</span>`).join('')}</div></div>`;
   if (t.notes) h+=`<div class="detail-section"><h3>Journal</h3><p>${t.notes.replace(/\n/g,'<br>')}</p></div>`;
   if (t.photos&&t.photos.length) h+=`<div class="detail-section"><h3>Photos</h3><div class="detail-photos">${t.photos.map(u=>`<img src="${u}" onerror="this.style.display='none'" loading="lazy">`).join('')}</div></div>`;
   const hasTrack = t.coords && Array.isArray(t.coords) && t.coords.length > 2;
@@ -2403,6 +2735,9 @@ map.on('click', (e) => {
   }
 });
 renderList(); renderMap();
+
+// Tag input → update modal tag picker chips in real time
+document.getElementById('fTags').addEventListener('input', renderModalTagPicker);
 
 // Pull from GitHub on load (non-blocking)
 syncFromGitHub();
