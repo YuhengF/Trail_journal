@@ -828,6 +828,8 @@ img.leaflet-tile { image-rendering: auto; }
     <button class="active" data-layer="streets">Faded</button>
     <button data-layer="muted">Grayscale</button>
     <button data-layer="dark">Dark</button>
+    <span style="width:1px;background:var(--border);margin:4px 2px;"></span>
+    <button class="active" id="trailToggle" onclick="toggleTrailVisibility()">Trails</button>
   </div>
 
   <div class="filter-badge" id="filterBadge"></div>
@@ -994,7 +996,8 @@ const STORAGE_KEY = 'trail_journal_data';
 const SYNC_CONFIG_KEY = 'trail_journal_sync';
 const TOMBSTONE_KEY = 'trail_journal_tombstones';
 let trails = [];
-let editingId = null, selectedId = null, currentRating = 0, gpxTrackData = null;
+let editingId = null, selectedId = null, currentRating = 0, gpxTrackData = null, gpxSpeedData = null;
+let trailsVisible = true, focusedTrailId = null;
 let syncPending = false;
 let ghSha = null;
 
@@ -1008,6 +1011,14 @@ function loadTrails() { try { trails = JSON.parse(localStorage.getItem(STORAGE_K
 function saveLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(trails)); }
 function genId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
 function getTrailColor(i) { return TRAIL_COLORS[i % TRAIL_COLORS.length]; }
+
+function modulateColor(hex, factor) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  const dr = Math.round(r*0.3 + (r-r*0.3)*factor);
+  const dg = Math.round(g*0.3 + (g-g*0.3)*factor);
+  const db = Math.round(b*0.3 + (b-b*0.3)*factor);
+  return '#'+[dr,dg,db].map(c=>Math.min(255,Math.max(0,c)).toString(16).padStart(2,'0')).join('');
+}
 
 // ===== TOMBSTONES — track deletions so they propagate across devices =====
 function getTombstones() {
@@ -1400,7 +1411,7 @@ function switchTileLayer(name) {
   map.removeLayer(tileLayers[currentTileLayer]);
   tileLayers[name].addTo(map);
   currentTileLayer = name;
-  document.querySelectorAll('.map-controls button').forEach(b => b.classList.toggle('active', b.dataset.layer === name));
+  document.querySelectorAll('.map-controls button[data-layer]').forEach(b => b.classList.toggle('active', b.dataset.layer === name));
   const tp = document.querySelector('.leaflet-tile-pane');
   if (name === 'streets') tp.style.filter = 'saturate(0.3) brightness(1.05) contrast(0.9)';
   else if (name === 'muted') tp.style.filter = 'saturate(0) brightness(1.1) contrast(0.85)';
@@ -1408,7 +1419,7 @@ function switchTileLayer(name) {
 }
 
 function renderMap() {
-  Object.values(trailLayers).forEach(l => { map.removeLayer(l.line); map.removeLayer(l.outline); map.removeLayer(l.hitArea); });
+  Object.values(trailLayers).forEach(l => { l.lines.forEach(x => map.removeLayer(x)); map.removeLayer(l.outline); map.removeLayer(l.hitArea); });
   trailLayers = {};
   const filtered = getFilteredTrails();
   const filteredIds = new Set(filtered.map(t => t.id));
@@ -1418,15 +1429,32 @@ function renderMap() {
     if (!t.coords || t.coords.length < 2) return;
     if (!filteredIds.has(t.id)) return;
     const color = getTrailColor(i);
-    // Wide invisible hit area for easy clicking/tapping (30px wide)
-    const hitArea = L.polyline(t.coords, { color: 'transparent', weight: 30, opacity: 0, smoothFactor: 1, interactive: true }).addTo(map);
-    // Dark outline for contrast against any map background
-    const outline = L.polyline(t.coords, { color: '#1a1a1e', weight: 8, opacity: 0.5, smoothFactor: 1, interactive: false }).addTo(map);
-    // Colored trail on top
-    const polyline = L.polyline(t.coords, { color, weight: 5, opacity: 1, smoothFactor: 1, interactive: false }).addTo(map);
-    hitArea.bindPopup(`<div class="trail-popup"><h3>${t.name}</h3><div class="popup-meta">${t.date || ''} ${t.distance ? '· '+t.distance+' mi':''} ${t.elevation ? '· '+t.elevation+' ft':''}<br><span style="color:${t.status==='wishlist'?'var(--wishlist)':'var(--green)'}">${t.status==='wishlist'?'★ Wishlist':'✓ Completed'}</span></div></div>`);
-    hitArea.on('click', () => openDetail(t.id));
-    trailLayers[t.id] = { line: polyline, outline, hitArea };
+    const hitArea = L.polyline(t.coords, { color: 'transparent', weight: 30, opacity: 0, smoothFactor: 1, interactive: true });
+    const outline = L.polyline(t.coords, { color: '#1a1a1e', weight: 8, opacity: 0.45, smoothFactor: 1, interactive: false });
+    if (trailsVisible) { hitArea.addTo(map); outline.addTo(map); }
+    hitArea.on('click', () => onMapTrailClick(t.id));
+    const lines = [];
+    if (t.speedData && t.speedData.speeds && t.speedData.speeds.length > 0) {
+      const { chunkSize, speeds } = t.speedData;
+      const MAX_SPEED = 12;
+      for (let si = 0; si < speeds.length; si++) {
+        const segStart = si * chunkSize;
+        const segEnd = Math.min(segStart + chunkSize + 1, t.coords.length);
+        const seg = t.coords.slice(segStart, segEnd);
+        if (seg.length < 2) continue;
+        const spd = speeds[si];
+        const factor = spd !== null ? Math.min(spd / MAX_SPEED, 1) : 0.5;
+        const segColor = modulateColor(color, factor);
+        const line = L.polyline(seg, { color: segColor, weight: 5, opacity: 0.92, smoothFactor: 1, interactive: false });
+        if (trailsVisible) line.addTo(map);
+        lines.push(line);
+      }
+    } else {
+      const line = L.polyline(t.coords, { color, weight: 5, opacity: 0.92, smoothFactor: 1, interactive: false });
+      if (trailsVisible) line.addTo(map);
+      lines.push(line);
+    }
+    trailLayers[t.id] = { lines, outline, hitArea };
     t.coords.forEach(c => bounds.push(c));
   });
 
@@ -1445,22 +1473,74 @@ function renderMap() {
 function focusTrail(id) {
   const layer = trailLayers[id];
   if (layer) {
-    map.fitBounds(layer.line.getBounds(), { padding: [80, 80], maxZoom: 15 });
+    map.fitBounds(layer.hitArea.getBounds(), { padding: [80, 80], maxZoom: 15 });
     Object.entries(trailLayers).forEach(([tid, l]) => {
-      l.line.setStyle({ opacity: tid === id ? 1 : 0.2, weight: tid === id ? 6 : 3 });
-      l.outline.setStyle({ opacity: tid === id ? 0.6 : 0.1 });
+      const f = tid === id;
+      l.lines.forEach(x => x.setStyle({ opacity: f ? 1 : 0.15, weight: f ? 6 : 3 }));
+      l.outline.setStyle({ opacity: f ? 0.55 : 0.05 });
     });
   }
 }
 
 function resetMapHighlight() {
-  Object.values(trailLayers).forEach(l => { l.line.setStyle({ opacity: 1, weight: 5 }); l.outline.setStyle({ opacity: 0.5 }); });
+  Object.values(trailLayers).forEach(l => { l.lines.forEach(x => x.setStyle({ opacity: 0.92, weight: 5 })); l.outline.setStyle({ opacity: 0.45 }); });
+}
+
+function isTrailProminentInView(trailId) {
+  const layer = trailLayers[trailId];
+  if (!layer) return false;
+  const tb = layer.hitArea.getBounds();
+  const mb = map.getBounds();
+  if (!mb.intersects(tb)) return false;
+  const tSpan = Math.max(tb.getNorthEast().lat - tb.getSouthWest().lat, tb.getNorthEast().lng - tb.getSouthWest().lng);
+  const mSpan = Math.max(mb.getNorthEast().lat - mb.getSouthWest().lat, mb.getNorthEast().lng - mb.getSouthWest().lng);
+  return tSpan / mSpan > 0.15;
+}
+
+function onMapTrailClick(trailId) {
+  const t = trails.find(x => x.id === trailId);
+  if (!t) return;
+  if (focusedTrailId === trailId || isTrailProminentInView(trailId)) {
+    focusedTrailId = null;
+    map.closePopup();
+    openDetail(trailId);
+  } else {
+    focusedTrailId = trailId;
+    focusTrail(trailId);
+    selectedId = trailId;
+    renderList();
+    const layer = trailLayers[trailId];
+    if (layer) {
+      const center = layer.hitArea.getBounds().getCenter();
+      L.popup({ closeButton: false, offset: [0, -4] })
+        .setLatLng(center)
+        .setContent(`<div class="trail-popup"><h3>${t.name}</h3><div class="popup-meta">${t.date||''} ${t.distance?'· '+t.distance+' mi':''}<br><em style="color:var(--text-muted);font-size:10px">tap trail again for details</em></div></div>`)
+        .openOn(map);
+    }
+  }
+}
+
+function toggleTrailVisibility() {
+  trailsVisible = !trailsVisible;
+  document.getElementById('trailToggle').classList.toggle('active', trailsVisible);
+  Object.values(trailLayers).forEach(l => {
+    if (trailsVisible) {
+      l.lines.forEach(x => x.addTo(map));
+      l.outline.addTo(map);
+      l.hitArea.addTo(map);
+    } else {
+      l.lines.forEach(x => map.removeLayer(x));
+      map.removeLayer(l.outline);
+      map.removeLayer(l.hitArea);
+      map.closePopup();
+    }
+  });
 }
 
 // ===== GPX PARSER =====
 function parseGPX(xmlStr) {
   const doc = new DOMParser().parseFromString(xmlStr, 'text/xml');
-  const coords = [], elevations = [];
+  const coords = [], elevations = [], times = [];
   let pts = doc.querySelectorAll('trkpt');
   if (!pts.length) pts = doc.querySelectorAll('rtept');
   if (!pts.length) pts = doc.querySelectorAll('wpt');
@@ -1470,6 +1550,8 @@ function parseGPX(xmlStr) {
       coords.push([lat, lon]);
       const ele = pt.querySelector('ele');
       if (ele) elevations.push(parseFloat(ele.textContent));
+      const timeEl = pt.querySelector('time');
+      times.push(timeEl ? new Date(timeEl.textContent).getTime() : null);
     }
   });
   let dist = 0;
@@ -1477,7 +1559,25 @@ function parseGPX(xmlStr) {
   let gain = 0;
   for (let i = 1; i < elevations.length; i++) { const d = elevations[i]-elevations[i-1]; if (d > 0) gain += d; }
   const nameEl = doc.querySelector('name');
-  return { coords, distance: (dist*0.621371).toFixed(1), elevation: Math.round(gain*3.28084), name: nameEl ? nameEl.textContent : '' };
+  let speedData = null;
+  const CHUNK = 10;
+  const validTimes = times.filter(t => t !== null).length;
+  if (validTimes > coords.length * 0.5 && coords.length > 2) {
+    const speeds = [];
+    for (let i = 0; i < coords.length - 1; i += CHUNK) {
+      const end = Math.min(i + CHUNK, coords.length - 1);
+      let segDist = 0;
+      for (let j = i; j < end; j++) segDist += haversine(coords[j], coords[j + 1]);
+      const t0 = times[i], t1 = times[end];
+      if (t0 && t1 && t1 > t0) {
+        speeds.push(Math.round((segDist / ((t1 - t0) / 3600000)) * 10) / 10);
+      } else {
+        speeds.push(null);
+      }
+    }
+    if (speeds.some(s => s !== null)) speedData = { chunkSize: CHUNK, speeds };
+  }
+  return { coords, distance: (dist*0.621371).toFixed(1), elevation: Math.round(gain*3.28084), name: nameEl ? nameEl.textContent : '', speedData };
 }
 
 function haversine([lat1,lon1],[lat2,lon2]) {
@@ -1517,10 +1617,9 @@ function showTrimPreview() {
 
   clearTrimPreview();
 
-  // Hide the original trail layers
   const orig = trailLayers[t.id];
   if (orig) {
-    orig.line.setStyle({ opacity: 0 });
+    orig.lines.forEach(x => x.setStyle({ opacity: 0 }));
     orig.outline.setStyle({ opacity: 0 });
   }
 
@@ -1565,8 +1664,8 @@ function restoreOriginalTrail() {
   if (t) {
     const orig = trailLayers[t.id];
     if (orig) {
-      orig.line.setStyle({ opacity: 1 });
-      orig.outline.setStyle({ opacity: 0.5 });
+      orig.lines.forEach(x => x.setStyle({ opacity: 1 }));
+      orig.outline.setStyle({ opacity: 0.45 });
     }
   }
 }
@@ -1592,7 +1691,7 @@ function openTrimModal() {
   // Dim all other trails so the preview stands out
   Object.entries(trailLayers).forEach(([tid, l]) => {
     if (tid !== t.id) {
-      l.line.setStyle({ opacity: 0.08 });
+      l.lines.forEach(x => x.setStyle({ opacity: 0.08 }));
       l.outline.setStyle({ opacity: 0.03 });
     }
   });
@@ -1646,8 +1745,8 @@ function updateTrimUI() {
 function closeTrimModal() {
   restoreOriginalTrail();
   Object.values(trailLayers).forEach(l => {
-    l.line.setStyle({ opacity: 1, weight: 5 });
-    l.outline.setStyle({ opacity: 0.5 });
+    l.lines.forEach(x => x.setStyle({ opacity: 0.92, weight: 5 }));
+    l.outline.setStyle({ opacity: 0.45 });
   });
   document.getElementById('trimPanel').classList.remove('open');
   const reopenId = trimTrailId;
@@ -1663,6 +1762,7 @@ function applyTrim() {
   const trimmed = t.coords.slice(start - 1, end);
   if (trimmed.length < 2) return;
   t.coords = trimmed;
+  t.speedData = null;
   t.distance = distanceFromCoords(trimmed);
   t.updatedAt = Date.now();
   clearTrimPreview();
@@ -1729,7 +1829,7 @@ document.querySelectorAll('.map-controls button').forEach(btn => {
 
 // ===== MODAL =====
 function openAddModal() {
-  editingId = null; gpxTrackData = null;
+  editingId = null; gpxTrackData = null; gpxSpeedData = null;
   document.getElementById('modalTitle').textContent = 'Add Trail';
   document.getElementById('saveBtn').textContent = 'Save Trail';
   clearForm();
@@ -1742,7 +1842,7 @@ function openAddModal() {
 
 function openEditModal(id) {
   const t = trails.find(x => x.id===id); if (!t) return;
-  editingId = id; gpxTrackData = t.coords || null;
+  editingId = id; gpxTrackData = t.coords || null; gpxSpeedData = t.speedData || null;
   document.getElementById('modalTitle').textContent = 'Edit Trail';
   document.getElementById('saveBtn').textContent = 'Update Trail';
   document.getElementById('fName').value = t.name||'';
@@ -1795,6 +1895,7 @@ function saveTrail() {
     notes: document.getElementById('fNotes').value.trim(),
     photos: document.getElementById('fPhotos').value.trim().split('\n').filter(Boolean),
     coords,
+    speedData: gpxSpeedData || (editingId ? (trails.find(x => x.id === editingId)?.speedData || null) : null),
     updatedAt: Date.now()
   };
   if (editingId) { const idx = trails.findIndex(t=>t.id===editingId); if (idx>=0) trails[idx]=trail; }
@@ -1829,10 +1930,12 @@ function handleGPXFile(file) {
     try {
       const r = parseGPX(e.target.result);
       gpxTrackData = r.coords;
+      gpxSpeedData = r.speedData || null;
       if (r.name && !document.getElementById('fName').value) document.getElementById('fName').value = r.name;
       if (r.distance) document.getElementById('fDistance').value = r.distance;
       if (r.elevation) document.getElementById('fElevation').value = r.elevation;
-      document.getElementById('gpxDrop').innerHTML = `<div style="color:var(--green)">✓ GPX loaded — ${r.coords.length} points, ${r.distance} mi, ${r.elevation} ft gain</div>`;
+      const speedNote = gpxSpeedData ? ', speed data captured' : '';
+      document.getElementById('gpxDrop').innerHTML = `<div style="color:var(--green)">✓ GPX loaded — ${r.coords.length} points, ${r.distance} mi, ${r.elevation} ft gain${speedNote}</div>`;
     } catch(err) { document.getElementById('gpxDrop').innerHTML = `<div style="color:#c0392b">Error: ${err.message}</div>`; }
   };
   reader.readAsText(file);
@@ -1842,7 +1945,7 @@ bindGpxInput();
 // ===== DETAIL PANEL =====
 function openDetail(id) {
   const t = trails.find(x=>x.id===id); if (!t) return;
-  selectedId = id; renderList();
+  selectedId = id; focusedTrailId = null; renderList();
   document.getElementById('detailName').textContent = t.name;
   let h = `<div class="detail-stat-grid">`;
   if (t.date) h+=`<div class="detail-stat"><div class="label">Date</div><div class="value">${t.date}</div></div>`;
@@ -1871,7 +1974,7 @@ function openDetail(id) {
   if (t.coords&&t.coords.length) focusTrail(id);
 }
 
-function closeDetail() { document.getElementById('detailPanel').classList.remove('open'); selectedId=null; resetMapHighlight(); renderList(); }
+function closeDetail() { document.getElementById('detailPanel').classList.remove('open'); selectedId=null; focusedTrailId=null; map.closePopup(); resetMapHighlight(); renderList(); }
 function editTrail() {
   const id = selectedId;
   if (id) { closeDetail(); openEditModal(id); }
@@ -2046,6 +2149,14 @@ document.getElementById('sidebarToggle')?.addEventListener('click', () => {
 
 // ===== INIT =====
 loadTrails(); initMap();
+map.on('click', (e) => {
+  if (focusedTrailId && !document.getElementById('detailPanel').classList.contains('open')) {
+    focusedTrailId = null;
+    selectedId = null;
+    resetMapHighlight();
+    renderList();
+  }
+});
 renderList(); renderMap();
 
 // Pull from GitHub on load (non-blocking)
