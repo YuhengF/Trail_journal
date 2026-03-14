@@ -1103,8 +1103,9 @@ async function testSync() {
 
     if (res.status === 200) {
       const data = await res.json();
-      const content = JSON.parse(atob(data.content));
-      result.innerHTML = `<div style="color:var(--green);font-size:12px;">✓ Connected! Found ${content.length} trail(s) in repo.</div>`;
+      const content = decodeBase64Json(data.content);
+      const trailCount = Array.isArray(content) ? content.length : (content?.trails?.length || 0);
+      result.innerHTML = `<div style="color:var(--green);font-size:12px;">✓ Connected! Found ${trailCount} trail(s) in repo.</div>`;
     } else if (res.status === 404) {
       // File doesn't exist yet — check if repo is accessible
       const repoRes = await fetch(`https://api.github.com/repos/${user}/${repo}`, {
@@ -1126,6 +1127,14 @@ async function testSync() {
 }
 
 // ===== GITHUB SYNC ENGINE =====
+function decodeBase64Json(b64) {
+  if (!b64) return null;
+  const bin = atob(b64.replace(/\s/g, ''));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
 let tokenBannerDismissed = false;
 
 function updateSyncStatus(state, text) {
@@ -1172,7 +1181,11 @@ async function syncFromGitHub() {
     if (res.status === 200) {
       const data = await res.json();
       ghSha = data.sha;
-      const raw = JSON.parse(atob(data.content));
+      const raw = decodeBase64Json(data.content);
+      if (raw == null) {
+        updateSyncStatus('error', 'Remote file empty or too large');
+        return;
+      }
 
       // Support both old format (plain array) and new format ({ trails, tombstones })
       const remoteTrails = Array.isArray(raw) ? raw : (raw.trails || []);
