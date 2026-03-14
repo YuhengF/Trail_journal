@@ -1860,7 +1860,7 @@ function openDetail(id) {
   if (t.photos&&t.photos.length) h+=`<div class="detail-section"><h3>Photos</h3><div class="detail-photos">${t.photos.map(u=>`<img src="${u}" onerror="this.style.display='none'" loading="lazy">`).join('')}</div></div>`;
   const hasTrack = t.coords && Array.isArray(t.coords) && t.coords.length > 2;
   if (hasTrack) {
-    h += `<div class="detail-section"><h3>Track</h3><p style="margin-bottom:8px;">${t.coords.length} GPS points recorded</p><button class="btn" onclick="openTrimModal()" style="padding:8px 16px;font-size:12px;">✂ Trim track</button></div>`;
+    h += `<div class="detail-section"><h3>Track</h3><p>${t.coords.length} GPS points recorded</p></div>`;
   }
   document.getElementById('detailBody').innerHTML = h;
   const trimBtn = document.getElementById('detailTrimBtn');
@@ -2023,10 +2023,22 @@ function switchMobileTab(tab) {
   tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
 
   if (tab === 'list') {
+    // Close detail panel and trim panel so user returns to the trail list view
+    document.getElementById('detailPanel').classList.remove('open');
+    document.getElementById('trimPanel').classList.remove('open');
+    if (trimTrailId) { restoreOriginalTrail(); trimTrailId = null; }
+    selectedId = null;
+    resetMapHighlight();
     sidebar.classList.add('mobile-visible');
   } else {
+    // Close detail panel and trim panel so user returns to a clean map view
+    document.getElementById('detailPanel').classList.remove('open');
+    document.getElementById('trimPanel').classList.remove('open');
+    if (trimTrailId) { restoreOriginalTrail(); trimTrailId = null; }
+    selectedId = null;
+    resetMapHighlight();
+    renderList();
     sidebar.classList.remove('mobile-visible');
-    // Refresh map size since it was hidden behind sidebar
     setTimeout(() => map.invalidateSize(), 300);
   }
 }
