@@ -394,28 +394,109 @@ body {
 
 .gpx-drop-zone input { display: none; }
 
-/* TRIM TRACK MODAL */
-.trim-description { font-size: 12px; color: var(--text-dim); line-height: 1.5; margin-bottom: 12px; }
-.trim-stats { font-size: 13px; margin-bottom: 14px; }
-.trim-stats strong { color: var(--accent); }
-.trim-sliders { display: flex; flex-direction: column; gap: 18px; margin: 10px 0 4px; }
-.trim-slider-row { display: flex; align-items: center; gap: 10px; }
-.trim-slider-min, .trim-slider-max { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); min-width: 24px; }
-.trim-range { flex: 1; height: 8px; -webkit-appearance: none; appearance: none; background: var(--border-light); border-radius: 4px; outline: none; border: 1px solid var(--border); }
-.trim-range::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); cursor: grab; border: 3px solid var(--bg-panel); box-shadow: 0 2px 8px rgba(199,98,58,0.35); transition: box-shadow 0.15s, transform 0.1s; }
-.trim-range::-webkit-slider-thumb:active { cursor: grabbing; transform: scale(1.15); box-shadow: 0 3px 12px rgba(199,98,58,0.5); }
-.trim-range::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); cursor: grab; border: 3px solid var(--bg-panel); box-shadow: 0 2px 8px rgba(199,98,58,0.35); }
+/* TRIM TRACK FLOATING PANEL */
+.trim-panel {
+  position: fixed;
+  bottom: 20px; left: 50%; transform: translateX(-50%) translateY(calc(100% + 40px));
+  z-index: 2500;
+  width: 420px; max-width: calc(100vw - 24px);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.35s cubic-bezier(0.34, 1.4, 0.64, 1), opacity 0.25s ease;
+}
+.trim-panel.open {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+.trim-panel-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 18px 0;
+}
+.trim-panel-header h2 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 16px; font-weight: 400;
+}
+.trim-panel-body { padding: 10px 18px 16px; }
+.trim-description { font-size: 11.5px; color: var(--text-muted); line-height: 1.45; margin-bottom: 12px; }
+.trim-slider-group { display: flex; flex-direction: column; gap: 12px; }
+.trim-slider-block {}
+.trim-slider-title {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 11px; font-weight: 500; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px;
+}
+.trim-slider-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px; font-weight: 600; color: var(--accent);
+  letter-spacing: 0; text-transform: none;
+}
+.trim-slider-row { display: flex; align-items: center; }
+.trim-range {
+  flex: 1; height: 6px;
+  -webkit-appearance: none; appearance: none;
+  background: var(--border-light); border-radius: 3px;
+  outline: none; border: 1px solid var(--border);
+}
+.trim-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--accent); cursor: grab;
+  border: 3px solid var(--bg-panel);
+  box-shadow: 0 2px 8px rgba(199,98,58,0.35);
+  transition: box-shadow 0.15s, transform 0.1s;
+}
+.trim-range::-webkit-slider-thumb:active {
+  cursor: grabbing; transform: scale(1.18);
+  box-shadow: 0 3px 14px rgba(199,98,58,0.55);
+}
+.trim-range::-moz-range-thumb {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--accent); cursor: grab;
+  border: 3px solid var(--bg-panel);
+  box-shadow: 0 2px 8px rgba(199,98,58,0.35);
+}
 .trim-range::-moz-range-thumb:active { cursor: grabbing; }
 .trim-range:focus { border-color: var(--accent); }
-.trim-slider-labels { display: flex; flex-direction: column; gap: 2px; font-size: 10px; color: var(--text-muted); margin-top: 4px; }
-.trim-preview { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--text); margin-top: 12px; transition: all 0.15s ease; }
+.trim-preview {
+  background: var(--accent-soft); border: 1px solid rgba(199,98,58,0.2);
+  border-radius: 8px; padding: 8px 12px;
+  font-size: 12.5px; color: var(--text); margin-top: 12px;
+  text-align: center;
+}
 .trim-preview strong { color: var(--accent); font-family: 'JetBrains Mono', monospace; }
-.trim-elev-note { font-size: 11px; color: var(--text-muted); margin-top: 10px; line-height: 1.4; }
-.trim-legend { display: flex; gap: 14px; margin-top: 10px; font-size: 11px; color: var(--text-dim); align-items: center; }
-.trim-legend-item { display: flex; align-items: center; gap: 5px; }
-.trim-legend-swatch { width: 20px; height: 3px; border-radius: 2px; }
-.trim-legend-dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--border); }
-#trimStartLabel, #trimEndLabel { font-family: 'JetBrains Mono', monospace; font-weight: 500; color: var(--accent); }
+.trim-legend {
+  display: flex; gap: 12px; margin-top: 8px;
+  font-size: 10px; color: var(--text-muted);
+  align-items: center; justify-content: center;
+}
+.trim-legend-item { display: flex; align-items: center; gap: 4px; }
+.trim-legend-swatch { width: 16px; height: 3px; border-radius: 2px; }
+.trim-legend-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  border: 1.5px solid #fff; box-shadow: 0 0 0 1px var(--border);
+}
+.trim-panel-actions {
+  display: flex; gap: 8px; margin-top: 12px;
+}
+.trim-panel-actions .btn { flex: 1; padding: 9px; font-size: 12px; }
+
+@media (max-width: 800px) {
+  .trim-panel {
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+    width: calc(100vw - 16px);
+    border-radius: 14px;
+  }
+  .trim-panel-header { padding: 12px 14px 0; }
+  .trim-panel-header h2 { font-size: 15px; }
+  .trim-panel-body { padding: 8px 14px 14px; }
+  .trim-range::-webkit-slider-thumb { width: 28px; height: 28px; }
+  .trim-panel-actions .btn { padding: 12px; font-size: 14px; }
+}
 
 /* MAP POPUP */
 .trail-popup { font-family: 'DM Sans', sans-serif; }
@@ -819,47 +900,38 @@ img.leaflet-tile { image-rendering: auto; }
   </div>
 </div>
 
-<!-- TRIM TRACK MODAL -->
-<div class="modal-overlay" id="trimModalOverlay" onclick="closeTrimModal(event)">
-  <div class="modal" onclick="event.stopPropagation()" style="width:480px">
-    <div class="modal-header">
-      <h2>Trim track</h2>
-      <button class="modal-close" onclick="closeTrimModal()">×</button>
-    </div>
-    <div class="modal-body">
-      <p class="trim-description">Remove unwanted points from the start or end (e.g. recording started too early or ended too late).</p>
-      <div class="trim-stats" id="trimStats">Track has <strong id="trimTotalPts">0</strong> points.</div>
-      <div class="form-group">
-        <label>Keep from point <span id="trimStartLabel">1</span> to point <span id="trimEndLabel">1</span></label>
-        <div class="trim-sliders">
-          <div class="trim-slider-row">
-            <span class="trim-slider-min">1</span>
-            <input type="range" id="trimStart" min="1" max="2" value="1" class="trim-range" oninput="onTrimSliderChange()">
-            <span class="trim-slider-max" id="trimStartMax">2</span>
-          </div>
-          <div class="trim-slider-row">
-            <span class="trim-slider-min">1</span>
-            <input type="range" id="trimEnd" min="1" max="2" value="2" class="trim-range" oninput="onTrimSliderChange()">
-            <span class="trim-slider-max" id="trimEndMax">2</span>
-          </div>
-        </div>
-        <div class="trim-slider-labels">
-          <span>Start of kept segment</span>
-          <span>End of kept segment</span>
+<!-- TRIM TRACK FLOATING PANEL -->
+<div class="trim-panel" id="trimPanel">
+  <div class="trim-panel-header">
+    <h2>✂ Trim track</h2>
+    <button class="modal-close" onclick="closeTrimModal()">×</button>
+  </div>
+  <div class="trim-panel-body">
+    <p class="trim-description">Drag the sliders to remove unwanted start/end points. Watch the map update live.</p>
+    <div class="trim-slider-group">
+      <div class="trim-slider-block">
+        <label class="trim-slider-title">Start <span class="trim-slider-val" id="trimStartLabel">1</span></label>
+        <div class="trim-slider-row">
+          <input type="range" id="trimStart" min="1" max="2" value="1" class="trim-range" oninput="onTrimSliderChange()">
         </div>
       </div>
-      <div class="trim-preview" id="trimPreview">
-        Keeping <strong id="trimKeepCount">0</strong> points → New distance: <strong id="trimNewDist">0</strong> mi
+      <div class="trim-slider-block">
+        <label class="trim-slider-title">End <span class="trim-slider-val" id="trimEndLabel">1</span></label>
+        <div class="trim-slider-row">
+          <input type="range" id="trimEnd" min="1" max="2" value="2" class="trim-range" oninput="onTrimSliderChange()">
+        </div>
       </div>
-      <div class="trim-legend">
-        <div class="trim-legend-item"><span class="trim-legend-swatch" style="background:#aaa;border:none;height:2px;background:repeating-linear-gradient(90deg,#aaa 0,#aaa 4px,transparent 4px,transparent 8px);"></span> Trimmed away</div>
-        <div class="trim-legend-item"><span class="trim-legend-swatch" style="background:var(--accent);height:4px;"></span> Keeping</div>
-        <div class="trim-legend-item"><span class="trim-legend-dot" style="background:#2eaa55;"></span> Start</div>
-        <div class="trim-legend-item"><span class="trim-legend-dot" style="background:#e8552e;"></span> End</div>
-      </div>
-      <p class="trim-elev-note" id="trimElevNote">Distance is recalculated automatically. Adjust elevation in Edit if needed.</p>
     </div>
-    <div class="modal-footer">
+    <div class="trim-preview" id="trimPreview">
+      Keeping <strong id="trimKeepCount">0</strong> of <strong id="trimTotalPts">0</strong> pts → <strong id="trimNewDist">0</strong> mi
+    </div>
+    <div class="trim-legend">
+      <div class="trim-legend-item"><span class="trim-legend-swatch" style="height:2px;background:repeating-linear-gradient(90deg,#999 0,#999 4px,transparent 4px,transparent 8px);"></span> Removed</div>
+      <div class="trim-legend-item"><span class="trim-legend-swatch" style="background:var(--accent);height:4px;"></span> Kept</div>
+      <div class="trim-legend-item"><span class="trim-legend-dot" style="background:#2eaa55;"></span> Start</div>
+      <div class="trim-legend-item"><span class="trim-legend-dot" style="background:#e8552e;"></span> End</div>
+    </div>
+    <div class="trim-panel-actions">
       <button class="btn" onclick="closeTrimModal()">Cancel</button>
       <button class="btn primary" id="trimApplyBtn" onclick="applyTrim()">Apply trim</button>
     </div>
@@ -1452,6 +1524,8 @@ function openTrimModal() {
   const t = trails.find(x => x.id === selectedId);
   if (!t || !t.coords || t.coords.length < 3) return;
   trimTrailId = t.id;
+  // Close the detail panel so map is fully visible
+  document.getElementById('detailPanel').classList.remove('open');
   const N = t.coords.length;
   const trimStartEl = document.getElementById('trimStart');
   const trimEndEl = document.getElementById('trimEnd');
@@ -1462,8 +1536,6 @@ function openTrimModal() {
   trimEndEl.max = N;
   trimEndEl.value = N;
   document.getElementById('trimTotalPts').textContent = N;
-  document.getElementById('trimStartMax').textContent = N - 1;
-  document.getElementById('trimEndMax').textContent = N;
   updateTrimUI();
   showTrimPreview();
   // Dim all other trails so the preview stands out
@@ -1473,7 +1545,9 @@ function openTrimModal() {
       l.outline.setStyle({ opacity: 0.03 });
     }
   });
-  document.getElementById('trimModalOverlay').classList.add('open');
+  // Fit map to the trail
+  focusTrail(t.id);
+  document.getElementById('trimPanel').classList.add('open');
 }
 
 function onTrimSliderChange() {
@@ -1518,17 +1592,16 @@ function updateTrimUI() {
   document.getElementById('trimApplyBtn').disabled = keepCount < 2;
 }
 
-function closeTrimModal(e) {
-  if (e && e.target !== e.currentTarget) return;
+function closeTrimModal() {
   restoreOriginalTrail();
-  // Restore other trails' opacity
   Object.values(trailLayers).forEach(l => {
     l.line.setStyle({ opacity: 1, weight: 5 });
     l.outline.setStyle({ opacity: 0.5 });
   });
-  document.getElementById('trimModalOverlay').classList.remove('open');
+  document.getElementById('trimPanel').classList.remove('open');
+  const reopenId = trimTrailId;
   trimTrailId = null;
-  if (selectedId) focusTrail(selectedId);
+  if (reopenId) openDetail(reopenId);
 }
 
 function applyTrim() {
@@ -1542,7 +1615,7 @@ function applyTrim() {
   t.distance = distanceFromCoords(trimmed);
   t.updatedAt = Date.now();
   clearTrimPreview();
-  document.getElementById('trimModalOverlay').classList.remove('open');
+  document.getElementById('trimPanel').classList.remove('open');
   trimTrailId = null;
   saveData();
   renderList();
