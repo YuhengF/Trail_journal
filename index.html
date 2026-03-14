@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Trail Journal</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f5f2ed;
+  --bg-panel: #ffffff;
+  --bg-card: #f9f7f4;
+  --bg-hover: #f0ede7;
+  --bg-input: #f5f2ed;
+  --border: #e0dbd3;
+  --border-light: #ece8e1;
+  --text: #2c2a26;
+  --text-dim: #6b6660;
+  --text-muted: #9e978e;
+  --accent: #c7623a;
+  --accent-soft: rgba(199, 98, 58, 0.10);
+  --green: #3d8c5c;
+  --green-soft: rgba(61, 140, 92, 0.10);
+  --blue: #3a7cb8;
+  --blue-soft: rgba(58, 124, 184, 0.10);
+  --wishlist: #9060a8;
+  --wishlist-soft: rgba(144, 96, 168, 0.10);
+  --radius: 10px;
+  --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app { display: flex; height: 100vh; position: relative; }
+#map { flex: 1; z-index: 1; }
+
+.sidebar {
+  width: 380px; min-width: 380px;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  z-index: 10; overflow: hidden;
+  transition: transform 0.3s ease;
+}
+
+.sidebar.hidden {
+  transform: translateX(-100%);
+  position: absolute; left: 0; top: 0; bottom: 0;
+}
+
+.sidebar-toggle {
+  position: fixed; top: 12px; left: 12px; z-index: 1000;
+  width: 42px; height: 42px;
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text);
+  font-size: 18px; cursor: pointer;
+  display: none; align-items: center; justify-content: center;
+  box-shadow: var(--shadow);
+}
+
+.sidebar-header {
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-header h1 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 22px; font-weight: 400;
+  letter-spacing: 0.3px; margin-bottom: 2px;
+}
+
+.sidebar-header .subtitle { font-size: 11.5px; color: var(--text-muted); }
+
+.stats-row { display: flex; gap: 16px; margin-top: 14px; }
+.stat { display: flex; flex-direction: column; }
+
+.stat-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px; font-weight: 500; color: var(--accent);
+}
+
+.stat-label {
+  font-size: 10px; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 1px; margin-top: 2px;
+}
+
+.controls {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 8px;
+}
+
+.search-box {
+  display: flex; align-items: center;
+  background: var(--bg-input); border: 1px solid var(--border-light);
+  border-radius: var(--radius); padding: 0 12px;
+}
+
+.search-box input {
+  flex: 1; background: none; border: none; color: var(--text);
+  font-family: inherit; font-size: 13px; padding: 9px 8px; outline: none;
+}
+
+.search-box input::placeholder { color: var(--text-muted); }
+
+.filter-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.chip {
+  font-size: 11px; padding: 4px 10px; border-radius: 20px;
+  border: 1px solid var(--border); background: none;
+  color: var(--text-dim); cursor: pointer; font-family: inherit;
+  transition: all 0.15s;
+}
+
+.chip:hover { border-color: var(--text-muted); background: var(--bg-hover); }
+.chip.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 500; }
+.chip.active-green { background: var(--green-soft); border-color: var(--green); color: var(--green); font-weight: 500; }
+.chip.active-wishlist { background: var(--wishlist-soft); border-color: var(--wishlist); color: var(--wishlist); font-weight: 500; }
+
+.trail-list { flex: 1; overflow-y: auto; padding: 8px 12px; }
+.trail-list::-webkit-scrollbar { width: 5px; }
+.trail-list::-webkit-scrollbar-track { background: transparent; }
+.trail-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+.trail-card {
+  padding: 12px 14px; border-radius: var(--radius);
+  cursor: pointer; transition: all 0.15s;
+  border: 1px solid transparent; margin-bottom: 4px;
+}
+
+.trail-card:hover { background: var(--bg-hover); }
+.trail-card.selected { background: var(--bg-card); border-color: var(--border); box-shadow: var(--shadow); }
+
+.trail-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
+.trail-name { font-size: 14px; font-weight: 500; line-height: 1.3; }
+
+.trail-status {
+  font-size: 9px; padding: 2px 8px; border-radius: 10px;
+  font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px;
+  white-space: nowrap; margin-left: 8px; flex-shrink: 0;
+}
+
+.trail-status.completed { background: var(--green-soft); color: var(--green); }
+.trail-status.wishlist { background: var(--wishlist-soft); color: var(--wishlist); }
+
+.trail-meta { font-size: 11px; color: var(--text-muted); display: flex; gap: 12px; flex-wrap: wrap; }
+.trail-tags { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+
+.trail-tag {
+  font-size: 10px; padding: 1px 7px; border-radius: 4px;
+  background: var(--bg-input); color: var(--text-dim); border: 1px solid var(--border-light);
+}
+
+.trail-rating { color: var(--accent); font-size: 11px; margin-top: 4px; }
+
+.sidebar-actions {
+  padding: 12px 20px; border-top: 1px solid var(--border);
+  display: flex; gap: 8px;
+}
+
+.btn {
+  flex: 1; padding: 10px; border-radius: var(--radius);
+  border: 1px solid var(--border); background: var(--bg-panel);
+  color: var(--text); font-family: inherit; font-size: 12px;
+  font-weight: 500; cursor: pointer; transition: all 0.15s; text-align: center;
+}
+
+.btn:hover { background: var(--bg-hover); border-color: var(--text-muted); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { background: #b5552f; }
+
+/* MAP LAYER SWITCHER */
+.map-controls {
+  position: fixed; top: 12px; right: 12px; z-index: 1000;
+  display: flex; gap: 4px;
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 4px; box-shadow: var(--shadow);
+}
+
+.map-controls button {
+  font-family: 'DM Sans', sans-serif; font-size: 11px;
+  padding: 5px 10px; border-radius: 7px; border: none;
+  background: none; color: var(--text-dim); cursor: pointer;
+  transition: all 0.15s; white-space: nowrap;
+}
+
+.map-controls button:hover { background: var(--bg-hover); }
+.map-controls button.active { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+
+/* FILTER BADGE */
+.filter-badge {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  z-index: 1000; background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 20px; padding: 6px 16px; font-size: 12px;
+  color: var(--text-dim); box-shadow: var(--shadow);
+  pointer-events: none; opacity: 0; transition: opacity 0.3s;
+}
+
+.filter-badge.visible { opacity: 1; }
+
+/* MODAL */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.25);
+  backdrop-filter: blur(4px); z-index: 2000;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity 0.2s;
+}
+
+.modal-overlay.open { opacity: 1; pointer-events: auto; }
+
+.modal {
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 14px; width: 520px; max-width: 95vw;
+  max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-lg);
+}
+
+.modal::-webkit-scrollbar { width: 5px; }
+.modal::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+.modal-header {
+  padding: 20px 24px 0; display: flex;
+  justify-content: space-between; align-items: center;
+}
+
+.modal-header h2 { font-family: 'DM Serif Display', serif; font-size: 18px; font-weight: 400; }
+
+.modal-close {
+  width: 30px; height: 30px; border-radius: 50%; border: none;
+  background: var(--bg-input); color: var(--text-dim); font-size: 16px; cursor: pointer;
+}
+
+.modal-body { padding: 16px 24px 24px; }
+.form-group { margin-bottom: 14px; }
+
+.form-group label {
+  display: block; font-size: 11px; font-weight: 500;
+  color: var(--text-dim); text-transform: uppercase;
+  letter-spacing: 0.8px; margin-bottom: 5px;
+}
+
+.form-group input, .form-group textarea, .form-group select {
+  width: 100%; background: var(--bg-input);
+  border: 1px solid var(--border-light); border-radius: 8px;
+  color: var(--text); font-family: inherit; font-size: 13px;
+  padding: 9px 12px; outline: none; transition: border-color 0.15s;
+}
+
+.form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: var(--accent); }
+.form-group textarea { resize: vertical; min-height: 70px; }
+.form-group select option { background: var(--bg-panel); }
+.form-row { display: flex; gap: 10px; }
+.form-row .form-group { flex: 1; }
+.form-group .star-input { display: flex; gap: 4px; }
+
+.form-group .star-input span {
+  font-size: 22px; cursor: pointer; color: var(--border); transition: color 0.1s;
+}
+
+.form-group .star-input span.filled { color: var(--accent); }
+
+.modal-footer {
+  padding: 0 24px 20px; display: flex; gap: 8px; justify-content: flex-end;
+}
+
+.modal-footer .btn { flex: none; padding: 10px 24px; }
+
+/* DETAIL PANEL */
+.detail-panel {
+  position: fixed; right: 0; top: 0; bottom: 0;
+  width: 400px; max-width: 100vw;
+  background: var(--bg-panel); border-left: 1px solid var(--border);
+  z-index: 1500; overflow-y: auto;
+  transform: translateX(100%); transition: transform 0.25s ease;
+  box-shadow: -4px 0 24px rgba(0,0,0,0.08);
+}
+
+.detail-panel.open { transform: translateX(0); }
+
+.detail-header {
+  padding: 20px; border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: flex-start;
+}
+
+.detail-header h2 {
+  font-family: 'DM Serif Display', serif; font-size: 20px;
+  font-weight: 400; line-height: 1.3; flex: 1;
+}
+
+.detail-actions { display: flex; gap: 6px; margin-left: 12px; }
+
+.detail-actions button {
+  width: 32px; height: 32px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg-input);
+  color: var(--text-dim); font-size: 14px; cursor: pointer;
+}
+
+.detail-actions button:hover { color: var(--text); border-color: var(--text-muted); }
+.detail-actions button.delete:hover { color: #c0392b; border-color: #c0392b; }
+
+.detail-body { padding: 20px; }
+
+.detail-stat-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 10px; margin-bottom: 20px;
+}
+
+.detail-stat {
+  background: var(--bg-input); border-radius: 8px;
+  padding: 10px 14px; border: 1px solid var(--border-light);
+}
+
+.detail-stat .label {
+  font-size: 10px; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.8px;
+}
+
+.detail-stat .value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 15px; margin-top: 2px; color: var(--text);
+}
+
+.detail-section { margin-bottom: 20px; }
+
+.detail-section h3 {
+  font-size: 11px; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;
+}
+
+.detail-section p { font-size: 13px; line-height: 1.6; color: var(--text-dim); }
+.detail-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.detail-tags .trail-tag { font-size: 11px; padding: 3px 10px; }
+.detail-photos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.detail-photos img {
+  width: 100%; border-radius: 8px; aspect-ratio: 4/3;
+  object-fit: cover; background: var(--bg-input);
+}
+
+/* GPX DROP */
+.gpx-drop-zone {
+  border: 2px dashed var(--border); border-radius: var(--radius);
+  padding: 20px; text-align: center; color: var(--text-muted);
+  font-size: 12px; cursor: pointer; transition: all 0.2s; margin-bottom: 14px;
+}
+
+.gpx-drop-zone:hover, .gpx-drop-zone.drag-over {
+  border-color: var(--accent); color: var(--accent); background: var(--accent-soft);
+}
+
+.gpx-drop-zone input { display: none; }
+
+/* MAP POPUP */
+.trail-popup { font-family: 'DM Sans', sans-serif; }
+.trail-popup h3 { font-family: 'DM Serif Display', serif; font-size: 15px; margin-bottom: 4px; }
+.trail-popup .popup-meta { font-size: 11px; color: #888; }
+
+.leaflet-popup-content-wrapper {
+  background: var(--bg-panel) !important; color: var(--text) !important;
+  border-radius: var(--radius) !important; box-shadow: var(--shadow-lg) !important;
+  border: 1px solid var(--border) !important;
+}
+
+.leaflet-popup-tip { background: var(--bg-panel) !important; }
+
+/* DESATURATE MAP TILES so trails stand out */
+.leaflet-tile-pane { filter: saturate(0.3) brightness(1.05) contrast(0.9); }
+.leaflet-overlay-pane { filter: none; }
+/* Hide broken/error tiles gracefully */
+.leaflet-tile-pane img.leaflet-tile[src=""] { display: none; }
+.leaflet-tile-pane .leaflet-tile-loaded { border: none !important; }
+img.leaflet-tile { image-rendering: auto; }
+
+.data-bar {
+  padding: 8px 20px; border-top: 1px solid var(--border);
+  display: flex; gap: 6px;
+}
+
+.data-bar .btn { font-size: 11px; padding: 6px 10px; }
+
+.sync-bar {
+  padding: 6px 20px;
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; color: var(--text-muted);
+}
+
+.sync-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--text-muted); flex-shrink: 0;
+  transition: background 0.3s;
+}
+
+.sync-dot.synced { background: var(--green); }
+.sync-dot.pending { background: var(--accent); animation: pulse 1.5s infinite; }
+.sync-dot.error { background: #c0392b; }
+.sync-dot.offline { background: var(--text-muted); }
+
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+@media (max-width: 800px) {
+  .sidebar {
+    position: fixed; left: 0; top: 0; bottom: 0;
+    z-index: 1500; width: 100%; min-width: unset;
+  }
+  .sidebar.hidden { transform: translateX(-100%); }
+  .sidebar-toggle { display: flex; }
+  .detail-panel { width: 100%; }
+  .map-controls { top: 12px; right: 56px; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <button class="sidebar-toggle" id="sidebarToggle">☰</button>
+
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h1>Trail Journal</h1>
+      <div class="subtitle">Your personal hiking collection</div>
+      <div class="stats-row">
+        <div class="stat"><span class="stat-val" id="statTrails">0</span><span class="stat-label">Trails</span></div>
+        <div class="stat"><span class="stat-val" id="statDistance">0</span><span class="stat-label">Total mi</span></div>
+        <div class="stat"><span class="stat-val" id="statElevation">0</span><span class="stat-label">Total ft ↑</span></div>
+        <div class="stat"><span class="stat-val" id="statWishlist">0</span><span class="stat-label">Wishlist</span></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="search-box">
+        <span style="color:var(--text-muted)">⌕</span>
+        <input type="text" id="searchInput" placeholder="Search trails, tags, notes...">
+      </div>
+      <div class="filter-chips">
+        <button class="chip active" data-filter="all">All</button>
+        <button class="chip" data-filter="completed">✓ Completed</button>
+        <button class="chip" data-filter="wishlist">★ Wishlist</button>
+        <button class="chip" data-filter="5star">5★ Only</button>
+      </div>
+    </div>
+
+    <div class="trail-list" id="trailList"></div>
+
+    <div class="data-bar">
+      <button class="btn" onclick="exportData()">↓ Export</button>
+      <button class="btn" onclick="document.getElementById('importJson').click()">↑ Import</button>
+      <input type="file" id="importJson" accept=".json" style="display:none" onchange="importData(event)">
+      <button class="btn" onclick="openSettings()" title="Sync settings">⚙ Sync</button>
+    </div>
+
+    <div class="sync-bar" id="syncBar">
+      <span class="sync-dot" id="syncDot"></span>
+      <span class="sync-text" id="syncText">Local only</span>
+    </div>
+
+    <div class="sidebar-actions">
+      <button class="btn primary" onclick="openAddModal()">+ Add Trail</button>
+    </div>
+  </div>
+
+  <div id="map"></div>
+
+  <div class="map-controls" id="mapControls">
+    <button class="active" data-layer="streets">Faded</button>
+    <button data-layer="muted">Grayscale</button>
+    <button data-layer="dark">Dark</button>
+  </div>
+
+  <div class="filter-badge" id="filterBadge"></div>
+</div>
+
+<!-- DETAIL PANEL -->
+<div class="detail-panel" id="detailPanel">
+  <div class="detail-header">
+    <h2 id="detailName"></h2>
+    <div class="detail-actions">
+      <button onclick="editTrail()" title="Edit">✎</button>
+      <button class="delete" onclick="deleteTrail()" title="Delete">✕</button>
+      <button onclick="closeDetail()" title="Close">←</button>
+    </div>
+  </div>
+  <div class="detail-body" id="detailBody"></div>
+</div>
+
+<!-- ADD/EDIT MODAL -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2 id="modalTitle">Add Trail</h2>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="gpx-drop-zone" id="gpxDrop">
+        <div>📂 Drop a GPX file here or click to import</div>
+        <div style="font-size:10px;margin-top:4px;color:var(--text-muted)">Auto-fills track, distance & elevation</div>
+        <input type="file" id="gpxFile" accept=".gpx">
+      </div>
+      <div class="form-group"><label>Trail Name *</label><input type="text" id="fName" placeholder="e.g. Mission Peak Loop"></div>
+      <div class="form-row">
+        <div class="form-group"><label>Date</label><input type="date" id="fDate"></div>
+        <div class="form-group"><label>Status</label><select id="fStatus"><option value="completed">Completed</option><option value="wishlist">Wishlist</option></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Distance (mi)</label><input type="number" id="fDistance" step="0.1" placeholder="0.0"></div>
+        <div class="form-group"><label>Elev. Gain (ft)</label><input type="number" id="fElevation" step="1" placeholder="0"></div>
+        <div class="form-group"><label>Duration</label><input type="text" id="fDuration" placeholder="2h 30m"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Difficulty</label><select id="fDifficulty"><option value="">—</option><option value="easy">Easy</option><option value="moderate">Moderate</option><option value="hard">Hard</option><option value="strenuous">Strenuous</option></select></div>
+        <div class="form-group"><label>Enjoyment (1-5)</label><div class="star-input" id="starInput"><span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span><span data-v="4">★</span><span data-v="5">★</span></div></div>
+      </div>
+      <div class="form-group"><label>Tags (comma-separated)</label><input type="text" id="fTags" placeholder="e.g. coastal, loop, redwoods, dogs-ok"></div>
+      <div class="form-group"><label>Weather / Conditions</label><input type="text" id="fWeather" placeholder="e.g. Sunny, 65°F, trail muddy in spots"></div>
+      <div class="form-group"><label>Companions</label><input type="text" id="fCompanions" placeholder="e.g. solo, with Alex & Sam"></div>
+      <div class="form-group"><label>Notes / Journal</label><textarea id="fNotes" rows="4" placeholder="Your thoughts, highlights, memories..."></textarea></div>
+      <div class="form-group"><label>Photo URLs (one per line)</label><textarea id="fPhotos" rows="2" placeholder="https://..."></textarea></div>
+      <div class="form-group"><label>Manual Coordinates (if no GPX) — <span style="color:var(--text-muted);text-transform:none;letter-spacing:0">JSON array of [lat, lng]</span></label><textarea id="fCoords" rows="2" placeholder='[[37.51, -121.88], [37.52, -121.87], ...]'></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" id="saveBtn" onclick="saveTrail()">Save Trail</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settingsOverlay" onclick="closeSettings(event)">
+  <div class="modal" onclick="event.stopPropagation()" style="width:440px">
+    <div class="modal-header">
+      <h2>Sync Settings</h2>
+      <button class="modal-close" onclick="closeSettings()">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:var(--text-dim);line-height:1.5;margin-bottom:16px;">
+        Sync your trail data to a GitHub repo so it's accessible from any device.
+        Your data is stored as a JSON file in the repo. Changes save locally first, then sync to GitHub.
+      </p>
+      <div class="form-group">
+        <label>GitHub Username</label>
+        <input type="text" id="ghUser" placeholder="e.g. yuuki">
+      </div>
+      <div class="form-group">
+        <label>Repository Name</label>
+        <input type="text" id="ghRepo" placeholder="e.g. trail-journal">
+      </div>
+      <div class="form-group">
+        <label>Personal Access Token <span style="color:var(--text-muted);text-transform:none;letter-spacing:0">(fine-grained, repo contents read/write)</span></label>
+        <input type="password" id="ghToken" placeholder="github_pat_...">
+      </div>
+      <div class="form-group">
+        <label>Data File Path</label>
+        <input type="text" id="ghPath" placeholder="data.json" value="data.json">
+      </div>
+      <p style="font-size:11px;color:var(--text-muted);line-height:1.5;margin-bottom:12px;">
+        To create a token: GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate.<br>
+        Give it <strong>Contents: Read and write</strong> permission on your trail-journal repo only.
+      </p>
+      <div id="syncTestResult"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="testSync()" id="testSyncBtn">Test Connection</button>
+      <button class="btn" onclick="clearSyncConfig()">Disconnect</button>
+      <button class="btn primary" onclick="saveSyncConfig()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'trail_journal_data';
+const SYNC_CONFIG_KEY = 'trail_journal_sync';
+let trails = [];
+let editingId = null, selectedId = null, currentRating = 0, gpxTrackData = null;
+let syncPending = false;
+let ghSha = null; // GitHub file SHA needed for updates
+
+const TRAIL_COLORS = [
+  '#e8552e','#2eaa55','#2e88dd','#b044dd','#dd9922',
+  '#dd2266','#00bbaa','#7755ee','#ee7722','#44aa33'
+];
+
+// ===== LOCAL STORAGE =====
+function loadTrails() { try { trails = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { trails = []; } }
+function saveLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(trails)); }
+function genId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
+function getTrailColor(i) { return TRAIL_COLORS[i % TRAIL_COLORS.length]; }
+
+// ===== SYNC CONFIG =====
+function getSyncConfig() {
+  try { return JSON.parse(localStorage.getItem(SYNC_CONFIG_KEY)) || null; } catch { return null; }
+}
+
+function openSettings() {
+  const cfg = getSyncConfig();
+  if (cfg) {
+    document.getElementById('ghUser').value = cfg.user || '';
+    document.getElementById('ghRepo').value = cfg.repo || '';
+    document.getElementById('ghToken').value = cfg.token || '';
+    document.getElementById('ghPath').value = cfg.path || 'data.json';
+  }
+  document.getElementById('syncTestResult').innerHTML = '';
+  document.getElementById('settingsOverlay').classList.add('open');
+}
+
+function closeSettings(e) {
+  if (e && e.target !== e.currentTarget) return;
+  document.getElementById('settingsOverlay').classList.remove('open');
+}
+
+function saveSyncConfig() {
+  const cfg = {
+    user: document.getElementById('ghUser').value.trim(),
+    repo: document.getElementById('ghRepo').value.trim(),
+    token: document.getElementById('ghToken').value.trim(),
+    path: document.getElementById('ghPath').value.trim() || 'data.json'
+  };
+  if (!cfg.user || !cfg.repo || !cfg.token) {
+    document.getElementById('syncTestResult').innerHTML = '<div style="color:#c0392b;font-size:12px;">Please fill in all fields.</div>';
+    return;
+  }
+  localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify(cfg));
+  closeSettings();
+  updateSyncStatus('synced', 'Connected to GitHub');
+  // Push current local data to GitHub
+  syncToGitHub();
+}
+
+function clearSyncConfig() {
+  localStorage.removeItem(SYNC_CONFIG_KEY);
+  ghSha = null;
+  updateSyncStatus('offline', 'Local only');
+  closeSettings();
+}
+
+async function testSync() {
+  const user = document.getElementById('ghUser').value.trim();
+  const repo = document.getElementById('ghRepo').value.trim();
+  const token = document.getElementById('ghToken').value.trim();
+  const path = document.getElementById('ghPath').value.trim() || 'data.json';
+  const result = document.getElementById('syncTestResult');
+
+  if (!user || !repo || !token) {
+    result.innerHTML = '<div style="color:#c0392b;font-size:12px;">Please fill in all fields first.</div>';
+    return;
+  }
+
+  result.innerHTML = '<div style="color:var(--text-muted);font-size:12px;">Testing...</div>';
+
+  try {
+    // Test: try to read the file (or confirm repo access)
+    const res = await fetch(`https://api.github.com/repos/${user}/${repo}/contents/${path}`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' }
+    });
+
+    if (res.status === 200) {
+      const data = await res.json();
+      const content = JSON.parse(atob(data.content));
+      result.innerHTML = `<div style="color:var(--green);font-size:12px;">✓ Connected! Found ${content.length} trail(s) in repo.</div>`;
+    } else if (res.status === 404) {
+      // File doesn't exist yet — check if repo is accessible
+      const repoRes = await fetch(`https://api.github.com/repos/${user}/${repo}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (repoRes.ok) {
+        result.innerHTML = '<div style="color:var(--green);font-size:12px;">✓ Repo accessible! Data file will be created on first sync.</div>';
+      } else {
+        result.innerHTML = '<div style="color:#c0392b;font-size:12px;">✕ Repo not found or token lacks access.</div>';
+      }
+    } else if (res.status === 401) {
+      result.innerHTML = '<div style="color:#c0392b;font-size:12px;">✕ Invalid token.</div>';
+    } else {
+      result.innerHTML = `<div style="color:#c0392b;font-size:12px;">✕ Error: ${res.status} ${res.statusText}</div>`;
+    }
+  } catch (err) {
+    result.innerHTML = `<div style="color:#c0392b;font-size:12px;">✕ Network error: ${err.message}</div>`;
+  }
+}
+
+// ===== GITHUB SYNC ENGINE =====
+function updateSyncStatus(state, text) {
+  const dot = document.getElementById('syncDot');
+  const label = document.getElementById('syncText');
+  dot.className = 'sync-dot ' + state;
+  label.textContent = text;
+}
+
+async function syncFromGitHub() {
+  const cfg = getSyncConfig();
+  if (!cfg) { updateSyncStatus('offline', 'Local only'); return; }
+
+  updateSyncStatus('pending', 'Pulling from GitHub...');
+
+  try {
+    const res = await fetch(`https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${cfg.path}`, {
+      headers: { 'Authorization': `Bearer ${cfg.token}`, 'Accept': 'application/vnd.github.v3+json' }
+    });
+
+    if (res.status === 200) {
+      const data = await res.json();
+      ghSha = data.sha;
+      const remote = JSON.parse(atob(data.content));
+
+      // Merge: remote wins for existing IDs, keep local-only additions
+      const remoteIds = new Set(remote.map(t => t.id));
+      const localOnly = trails.filter(t => !remoteIds.has(t.id));
+      trails = [...remote, ...localOnly];
+      saveLocal();
+      renderList();
+      renderMap();
+      updateSyncStatus('synced', 'Synced just now');
+
+      // If we had local-only items, push them back
+      if (localOnly.length > 0) syncToGitHub();
+    } else if (res.status === 404) {
+      // File doesn't exist — push local data up
+      ghSha = null;
+      updateSyncStatus('synced', 'Connected (no remote data yet)');
+      if (trails.length > 0) syncToGitHub();
+    } else {
+      updateSyncStatus('error', `Pull failed: ${res.status}`);
+    }
+  } catch (err) {
+    updateSyncStatus('error', 'Offline — using local data');
+  }
+}
+
+async function syncToGitHub() {
+  const cfg = getSyncConfig();
+  if (!cfg) return;
+
+  updateSyncStatus('pending', 'Pushing to GitHub...');
+
+  try {
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(trails, null, 2))));
+    const body = {
+      message: `Update trails — ${new Date().toISOString().split('T')[0]}`,
+      content: content
+    };
+    if (ghSha) body.sha = ghSha;
+
+    const res = await fetch(`https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${cfg.path}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${cfg.token}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      ghSha = data.content.sha;
+      syncPending = false;
+      updateSyncStatus('synced', 'Synced just now');
+    } else if (res.status === 409) {
+      // Conflict — pull first then retry
+      await syncFromGitHub();
+      await syncToGitHub();
+    } else {
+      updateSyncStatus('error', `Push failed: ${res.status}`);
+      syncPending = true;
+    }
+  } catch (err) {
+    updateSyncStatus('error', 'Offline — will sync later');
+    syncPending = true;
+  }
+}
+
+// Debounced sync — waits 2s after last change before pushing
+let syncTimer = null;
+function saveData() {
+  saveLocal();
+  const cfg = getSyncConfig();
+  if (cfg) {
+    updateSyncStatus('pending', 'Saving...');
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => syncToGitHub(), 2000);
+  }
+}
+
+// Retry pending syncs when coming back online
+window.addEventListener('online', () => {
+  if (syncPending || getSyncConfig()) {
+    syncFromGitHub();
+  }
+});
+
+// ===== FILTERING =====
+function getFilteredTrails() {
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  const chip = document.querySelector('.chip.active, .chip.active-green, .chip.active-wishlist');
+  const filter = chip?.dataset.filter || 'all';
+  return trails.filter(t => {
+    if (filter === 'completed' && t.status !== 'completed') return false;
+    if (filter === 'wishlist' && t.status !== 'wishlist') return false;
+    if (filter === '5star' && t.rating !== 5) return false;
+    if (search) {
+      const hay = `${t.name} ${(t.tags||[]).join(' ')} ${t.notes||''} ${t.weather||''} ${t.companions||''} ${t.difficulty||''}`.toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+}
+
+// ===== MAP =====
+let map, trailLayers = {}, tileLayers = {}, currentTileLayer = null;
+
+function initMap() {
+  map = L.map('map', { zoomControl: true }).setView([37.87, -122.27], 10);
+  const tileOpts = { attribution: '&copy; OpenStreetMap', maxZoom: 19 };
+  tileLayers.streets = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', tileOpts);
+  tileLayers.muted = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', tileOpts);
+  tileLayers.dark = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', tileOpts);
+  tileLayers.streets.addTo(map);
+  currentTileLayer = 'streets';
+  Object.values(tileLayers).forEach(layer => {
+    layer.on('tileerror', (e) => { if (e.tile) e.tile.style.display = 'none'; });
+  });
+}
+
+function switchTileLayer(name) {
+  if (currentTileLayer === name) return;
+  map.removeLayer(tileLayers[currentTileLayer]);
+  tileLayers[name].addTo(map);
+  currentTileLayer = name;
+  document.querySelectorAll('.map-controls button').forEach(b => b.classList.toggle('active', b.dataset.layer === name));
+  const tp = document.querySelector('.leaflet-tile-pane');
+  if (name === 'streets') tp.style.filter = 'saturate(0.3) brightness(1.05) contrast(0.9)';
+  else if (name === 'muted') tp.style.filter = 'saturate(0) brightness(1.1) contrast(0.85)';
+  else if (name === 'dark') tp.style.filter = 'saturate(0.2) brightness(0.55) contrast(1.1) invert(1) hue-rotate(180deg)';
+}
+
+function renderMap() {
+  Object.values(trailLayers).forEach(l => { map.removeLayer(l.line); map.removeLayer(l.outline); });
+  trailLayers = {};
+  const filtered = getFilteredTrails();
+  const filteredIds = new Set(filtered.map(t => t.id));
+  const bounds = [];
+
+  trails.forEach((t, i) => {
+    if (!t.coords || t.coords.length < 2) return;
+    if (!filteredIds.has(t.id)) return;
+    const color = getTrailColor(i);
+    // Dark outline for contrast against any map background
+    const outline = L.polyline(t.coords, { color: '#1a1a1e', weight: 8, opacity: 0.5, smoothFactor: 1, interactive: false }).addTo(map);
+    // Colored trail on top
+    const polyline = L.polyline(t.coords, { color, weight: 5, opacity: 1, smoothFactor: 1 }).addTo(map);
+    polyline.bindPopup(`<div class="trail-popup"><h3>${t.name}</h3><div class="popup-meta">${t.date || ''} ${t.distance ? '· '+t.distance+' mi':''} ${t.elevation ? '· '+t.elevation+' ft':''}<br><span style="color:${t.status==='wishlist'?'var(--wishlist)':'var(--green)'}">${t.status==='wishlist'?'★ Wishlist':'✓ Completed'}</span></div></div>`);
+    polyline.on('click', () => openDetail(t.id));
+    trailLayers[t.id] = { line: polyline, outline };
+    t.coords.forEach(c => bounds.push(c));
+  });
+
+  if (bounds.length > 0) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 });
+
+  // Badge
+  const badge = document.getElementById('filterBadge');
+  const activeFilter = document.querySelector('.chip.active, .chip.active-green, .chip.active-wishlist')?.dataset.filter || 'all';
+  const searchVal = document.getElementById('searchInput').value.trim();
+  if (activeFilter !== 'all' || searchVal) {
+    badge.textContent = `Showing ${filtered.length} of ${trails.length} trails on map`;
+    badge.classList.add('visible');
+  } else { badge.classList.remove('visible'); }
+}
+
+function focusTrail(id) {
+  const layer = trailLayers[id];
+  if (layer) {
+    map.fitBounds(layer.line.getBounds(), { padding: [80, 80], maxZoom: 15 });
+    Object.entries(trailLayers).forEach(([tid, l]) => {
+      l.line.setStyle({ opacity: tid === id ? 1 : 0.2, weight: tid === id ? 6 : 3 });
+      l.outline.setStyle({ opacity: tid === id ? 0.6 : 0.1 });
+    });
+  }
+}
+
+function resetMapHighlight() {
+  Object.values(trailLayers).forEach(l => { l.line.setStyle({ opacity: 1, weight: 5 }); l.outline.setStyle({ opacity: 0.5 }); });
+}
+
+// ===== GPX PARSER =====
+function parseGPX(xmlStr) {
+  const doc = new DOMParser().parseFromString(xmlStr, 'text/xml');
+  const coords = [], elevations = [];
+  let pts = doc.querySelectorAll('trkpt');
+  if (!pts.length) pts = doc.querySelectorAll('rtept');
+  if (!pts.length) pts = doc.querySelectorAll('wpt');
+  pts.forEach(pt => {
+    const lat = parseFloat(pt.getAttribute('lat')), lon = parseFloat(pt.getAttribute('lon'));
+    if (!isNaN(lat) && !isNaN(lon)) {
+      coords.push([lat, lon]);
+      const ele = pt.querySelector('ele');
+      if (ele) elevations.push(parseFloat(ele.textContent));
+    }
+  });
+  let dist = 0;
+  for (let i = 1; i < coords.length; i++) dist += haversine(coords[i-1], coords[i]);
+  let gain = 0;
+  for (let i = 1; i < elevations.length; i++) { const d = elevations[i]-elevations[i-1]; if (d > 0) gain += d; }
+  const nameEl = doc.querySelector('name');
+  return { coords, distance: (dist*0.621371).toFixed(1), elevation: Math.round(gain*3.28084), name: nameEl ? nameEl.textContent : '' };
+}
+
+function haversine([lat1,lon1],[lat2,lon2]) {
+  const R=6371, dLat=(lat2-lat1)*Math.PI/180, dLon=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+// ===== TRAIL LIST =====
+function renderList() {
+  const list = document.getElementById('trailList');
+  let filtered = getFilteredTrails();
+  filtered.sort((a,b) => { if (a.status !== b.status) return a.status==='completed'?-1:1; if (a.date&&b.date) return b.date.localeCompare(a.date); return 0; });
+  list.innerHTML = filtered.length === 0
+    ? `<div style="text-align:center;padding:40px 20px;color:var(--text-muted);font-size:13px;">${trails.length===0?'No trails yet — add your first one!':'No matches found.'}</div>`
+    : filtered.map(t => {
+      const color = getTrailColor(trails.indexOf(t));
+      return `<div class="trail-card ${selectedId===t.id?'selected':''}" onclick="openDetail('${t.id}')">
+        <div class="trail-card-header">
+          <span class="trail-name"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:6px;vertical-align:middle;"></span>${t.name}</span>
+          <span class="trail-status ${t.status}">${t.status==='wishlist'?'★ Wishlist':'✓ Done'}</span>
+        </div>
+        <div class="trail-meta">${t.date?`<span>${t.date}</span>`:''}${t.distance?`<span>${t.distance} mi</span>`:''}${t.elevation?`<span>${t.elevation} ft ↑</span>`:''}${t.duration?`<span>${t.duration}</span>`:''}${t.difficulty?`<span>${t.difficulty}</span>`:''}</div>
+        ${t.rating?`<div class="trail-rating">${'★'.repeat(t.rating)}${'☆'.repeat(5-t.rating)}</div>`:''}
+        ${(t.tags&&t.tags.length)?`<div class="trail-tags">${t.tags.map(tg=>`<span class="trail-tag">${tg}</span>`).join('')}</div>`:''}
+      </div>`;
+    }).join('');
+  updateStats();
+}
+
+function updateStats() {
+  const c = trails.filter(t => t.status==='completed');
+  document.getElementById('statTrails').textContent = c.length;
+  document.getElementById('statDistance').textContent = c.reduce((s,t) => s+(parseFloat(t.distance)||0), 0).toFixed(1);
+  document.getElementById('statElevation').textContent = Math.round(c.reduce((s,t) => s+(parseInt(t.elevation)||0), 0)).toLocaleString();
+  document.getElementById('statWishlist').textContent = trails.filter(t => t.status==='wishlist').length;
+}
+
+// ===== FILTER CHIPS + SEARCH → SYNC MAP =====
+document.querySelectorAll('.chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.chip').forEach(c => c.className = 'chip');
+    const f = chip.dataset.filter;
+    chip.classList.add(f==='completed'?'active-green':f==='wishlist'?'active-wishlist':'active');
+    renderList(); renderMap();
+  });
+});
+document.getElementById('searchInput').addEventListener('input', () => { renderList(); renderMap(); });
+
+// ===== MAP LAYER BUTTONS =====
+document.querySelectorAll('.map-controls button').forEach(btn => {
+  btn.addEventListener('click', () => switchTileLayer(btn.dataset.layer));
+});
+
+// ===== MODAL =====
+function openAddModal() {
+  editingId = null; gpxTrackData = null;
+  document.getElementById('modalTitle').textContent = 'Add Trail';
+  document.getElementById('saveBtn').textContent = 'Save Trail';
+  clearForm();
+  document.getElementById('fDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('modalOverlay').classList.add('open');
+  document.getElementById('gpxDrop').innerHTML = `<div>📂 Drop a GPX file here or click to import</div><div style="font-size:10px;margin-top:4px;color:var(--text-muted)">Auto-fills track, distance & elevation</div><input type="file" id="gpxFile" accept=".gpx">`;
+  bindGpxInput();
+  if (window.innerWidth <= 800) document.getElementById('sidebar').classList.add('hidden');
+}
+
+function openEditModal(id) {
+  const t = trails.find(x => x.id===id); if (!t) return;
+  editingId = id; gpxTrackData = t.coords || null;
+  document.getElementById('modalTitle').textContent = 'Edit Trail';
+  document.getElementById('saveBtn').textContent = 'Update Trail';
+  document.getElementById('fName').value = t.name||'';
+  document.getElementById('fDate').value = t.date||'';
+  document.getElementById('fStatus').value = t.status||'completed';
+  document.getElementById('fDistance').value = t.distance||'';
+  document.getElementById('fElevation').value = t.elevation||'';
+  document.getElementById('fDuration').value = t.duration||'';
+  document.getElementById('fDifficulty').value = t.difficulty||'';
+  setStars(t.rating||0);
+  document.getElementById('fTags').value = (t.tags||[]).join(', ');
+  document.getElementById('fWeather').value = t.weather||'';
+  document.getElementById('fCompanions').value = t.companions||'';
+  document.getElementById('fNotes').value = t.notes||'';
+  document.getElementById('fPhotos').value = (t.photos||[]).join('\n');
+  document.getElementById('fCoords').value = t.coords ? JSON.stringify(t.coords) : '';
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function closeModal(e) { if (e && e.target !== e.currentTarget) return; document.getElementById('modalOverlay').classList.remove('open'); }
+
+function clearForm() {
+  ['fName','fDate','fDistance','fElevation','fDuration','fTags','fWeather','fCompanions','fNotes','fPhotos','fCoords'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('fStatus').value = 'completed';
+  document.getElementById('fDifficulty').value = '';
+  setStars(0);
+}
+
+function saveTrail() {
+  const name = document.getElementById('fName').value.trim();
+  if (!name) { document.getElementById('fName').focus(); return; }
+  let coords = gpxTrackData;
+  if (!coords) { try { const raw = document.getElementById('fCoords').value.trim(); if (raw) coords = JSON.parse(raw); } catch {} }
+  const trail = {
+    id: editingId || genId(), name,
+    date: document.getElementById('fDate').value,
+    status: document.getElementById('fStatus').value,
+    distance: document.getElementById('fDistance').value,
+    elevation: document.getElementById('fElevation').value,
+    duration: document.getElementById('fDuration').value,
+    difficulty: document.getElementById('fDifficulty').value,
+    rating: currentRating,
+    tags: document.getElementById('fTags').value.split(',').map(s=>s.trim()).filter(Boolean),
+    weather: document.getElementById('fWeather').value.trim(),
+    companions: document.getElementById('fCompanions').value.trim(),
+    notes: document.getElementById('fNotes').value.trim(),
+    photos: document.getElementById('fPhotos').value.trim().split('\n').filter(Boolean),
+    coords
+  };
+  if (editingId) { const idx = trails.findIndex(t=>t.id===editingId); if (idx>=0) trails[idx]=trail; }
+  else trails.push(trail);
+  saveData(); closeModal(); renderList(); renderMap();
+  if (trail.coords) setTimeout(()=>openDetail(trail.id), 200);
+}
+
+// ===== STARS =====
+const starEls = document.querySelectorAll('#starInput span');
+function setStars(n) { currentRating=n; starEls.forEach(s=>s.classList.toggle('filled',parseInt(s.dataset.v)<=n)); }
+starEls.forEach(s => {
+  s.addEventListener('click', ()=>setStars(parseInt(s.dataset.v)));
+  s.addEventListener('mouseenter', ()=>{ const v=parseInt(s.dataset.v); starEls.forEach(ss=>ss.style.color=parseInt(ss.dataset.v)<=v?'var(--accent)':''); });
+});
+document.getElementById('starInput').addEventListener('mouseleave', ()=>starEls.forEach(ss=>ss.style.color=''));
+
+// ===== GPX DROP =====
+function bindGpxInput() {
+  const drop = document.getElementById('gpxDrop'), inp = document.getElementById('gpxFile');
+  if (!drop||!inp) return;
+  drop.addEventListener('click', ()=>inp.click());
+  drop.addEventListener('dragover', e=>{ e.preventDefault(); drop.classList.add('drag-over'); });
+  drop.addEventListener('dragleave', ()=>drop.classList.remove('drag-over'));
+  drop.addEventListener('drop', e=>{ e.preventDefault(); drop.classList.remove('drag-over'); if(e.dataTransfer.files.length) handleGPXFile(e.dataTransfer.files[0]); });
+  inp.addEventListener('change', e=>{ if(e.target.files.length) handleGPXFile(e.target.files[0]); });
+}
+
+function handleGPXFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const r = parseGPX(e.target.result);
+      gpxTrackData = r.coords;
+      if (r.name && !document.getElementById('fName').value) document.getElementById('fName').value = r.name;
+      if (r.distance) document.getElementById('fDistance').value = r.distance;
+      if (r.elevation) document.getElementById('fElevation').value = r.elevation;
+      document.getElementById('gpxDrop').innerHTML = `<div style="color:var(--green)">✓ GPX loaded — ${r.coords.length} points, ${r.distance} mi, ${r.elevation} ft gain</div>`;
+    } catch(err) { document.getElementById('gpxDrop').innerHTML = `<div style="color:#c0392b">Error: ${err.message}</div>`; }
+  };
+  reader.readAsText(file);
+}
+bindGpxInput();
+
+// ===== DETAIL PANEL =====
+function openDetail(id) {
+  const t = trails.find(x=>x.id===id); if (!t) return;
+  selectedId = id; renderList();
+  document.getElementById('detailName').textContent = t.name;
+  let h = `<div class="detail-stat-grid">`;
+  if (t.date) h+=`<div class="detail-stat"><div class="label">Date</div><div class="value">${t.date}</div></div>`;
+  if (t.distance) h+=`<div class="detail-stat"><div class="label">Distance</div><div class="value">${t.distance} mi</div></div>`;
+  if (t.elevation) h+=`<div class="detail-stat"><div class="label">Elev. Gain</div><div class="value">${parseInt(t.elevation).toLocaleString()} ft</div></div>`;
+  if (t.duration) h+=`<div class="detail-stat"><div class="label">Duration</div><div class="value">${t.duration}</div></div>`;
+  if (t.difficulty) h+=`<div class="detail-stat"><div class="label">Difficulty</div><div class="value" style="text-transform:capitalize">${t.difficulty}</div></div>`;
+  if (t.status) h+=`<div class="detail-stat"><div class="label">Status</div><div class="value" style="color:${t.status==='wishlist'?'var(--wishlist)':'var(--green)'}">${t.status==='wishlist'?'★ Wishlist':'✓ Completed'}</div></div>`;
+  if (t.rating) h+=`<div class="detail-stat"><div class="label">Rating</div><div class="value" style="color:var(--accent)">${'★'.repeat(t.rating)}${'☆'.repeat(5-t.rating)}</div></div>`;
+  if (t.weather) h+=`<div class="detail-stat"><div class="label">Weather</div><div class="value" style="font-family:'DM Sans';font-size:12px">${t.weather}</div></div>`;
+  h += `</div>`;
+  if (t.companions) h+=`<div class="detail-section"><h3>Companions</h3><p>${t.companions}</p></div>`;
+  if (t.tags&&t.tags.length) h+=`<div class="detail-section"><h3>Tags</h3><div class="detail-tags">${t.tags.map(tg=>`<span class="trail-tag">${tg}</span>`).join('')}</div></div>`;
+  if (t.notes) h+=`<div class="detail-section"><h3>Journal</h3><p>${t.notes.replace(/\n/g,'<br>')}</p></div>`;
+  if (t.photos&&t.photos.length) h+=`<div class="detail-section"><h3>Photos</h3><div class="detail-photos">${t.photos.map(u=>`<img src="${u}" onerror="this.style.display='none'" loading="lazy">`).join('')}</div></div>`;
+  document.getElementById('detailBody').innerHTML = h;
+  document.getElementById('detailPanel').classList.add('open');
+  if (t.coords&&t.coords.length) focusTrail(id);
+}
+
+function closeDetail() { document.getElementById('detailPanel').classList.remove('open'); selectedId=null; resetMapHighlight(); renderList(); }
+function editTrail() { if (selectedId) { closeDetail(); openEditModal(selectedId); } }
+
+function deleteTrail() {
+  if (!selectedId) return; if (!confirm('Delete this trail?')) return;
+  trails = trails.filter(t=>t.id!==selectedId);
+  saveData(); closeDetail(); renderList(); renderMap();
+}
+
+// ===== EXPORT / IMPORT =====
+function exportData() {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(trails,null,2)], {type:'application/json'}));
+  a.download = `trail-journal-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+}
+
+function importData(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (Array.isArray(data)) {
+        const ids = new Set(trails.map(t=>t.id));
+        let added = 0;
+        data.forEach(t => { if (!ids.has(t.id)) { trails.push(t); added++; } });
+        saveData(); renderList(); renderMap();
+        alert(`Imported ${added} new trail(s). ${data.length-added} duplicates skipped.`);
+      }
+    } catch(err) { alert('Error: '+err.message); }
+  };
+  reader.readAsText(file); e.target.value='';
+}
+
+// ===== SIDEBAR TOGGLE =====
+document.getElementById('sidebarToggle').addEventListener('click', () => document.getElementById('sidebar').classList.toggle('hidden'));
+
+// ===== INIT =====
+loadTrails(); initMap();
+
+if (trails.length === 0) {
+  trails = [
+    { id:genId(), name:"Mission Peak via Ohlone College", date:"2025-11-15", status:"completed", distance:"5.8", elevation:"2100", duration:"3h 15m", difficulty:"hard", rating:4, tags:["bay-area","peak","out-and-back","views"], weather:"Clear, 58°F, windy at summit", companions:"with Alex", notes:"The final push to the summit pole was brutal but the 360° view was worth it. Could see SF, the bay bridges, and all the way to the Sierra on a clear day.", photos:[], coords:[[37.5073,-121.8816],[37.5065,-121.8798],[37.5048,-121.8775],[37.5035,-121.8752],[37.5019,-121.8731],[37.4997,-121.8708],[37.4978,-121.8683],[37.4963,-121.8656],[37.4951,-121.8627],[37.4942,-121.8594],[37.4938,-121.8559],[37.4941,-121.8523],[37.4948,-121.8487],[37.4959,-121.8453],[37.4972,-121.8424]] },
+    { id:genId(), name:"Tilden Park: Wildcat Peak", date:"2025-12-01", status:"completed", distance:"3.2", elevation:"780", duration:"1h 45m", difficulty:"moderate", rating:5, tags:["bay-area","loop","berkeley-hills","wildflowers"], weather:"Overcast, 52°F, light drizzle", companions:"solo", notes:"Perfect quick escape from campus. The eucalyptus grove smells incredible after rain. Spotted a red-tailed hawk circling above the peak.", photos:[], coords:[[37.9052,-122.2446],[37.9061,-122.2431],[37.9074,-122.2412],[37.9088,-122.2397],[37.9098,-122.2378],[37.9112,-122.2361],[37.9125,-122.2348],[37.9139,-122.2336],[37.9148,-122.2318],[37.9157,-122.2301],[37.9162,-122.2283]] },
+    { id:genId(), name:"Point Reyes: Tomales Point Trail", date:"", status:"wishlist", distance:"9.4", elevation:"900", duration:"", difficulty:"moderate", rating:0, tags:["marin","coastal","out-and-back","elk","wildflowers"], weather:"", companions:"", notes:"Heard this is amazing in spring with wildflowers + tule elk. Need to time it for a clear day.", photos:[], coords:[[38.1182,-122.9553],[38.1215,-122.9571],[38.1249,-122.9598],[38.1281,-122.9622],[38.1318,-122.9641],[38.1357,-122.9663],[38.1392,-122.9678],[38.1431,-122.9701],[38.1468,-122.9717],[38.1503,-122.9738],[38.1541,-122.9751],[38.1578,-122.9769],[38.1612,-122.9789]] }
+  ];
+  saveLocal();
+}
+renderList(); renderMap();
+
+// Pull from GitHub on load (non-blocking)
+syncFromGitHub();
+</script>
+</body>
+</html>
