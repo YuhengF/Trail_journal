@@ -1855,7 +1855,7 @@ document.querySelectorAll('.chip').forEach(chip => {
 document.getElementById('searchInput').addEventListener('input', () => { renderList(); renderMap(); });
 
 // ===== MAP LAYER BUTTONS =====
-document.querySelectorAll('.map-controls button').forEach(btn => {
+document.querySelectorAll('.map-controls button[data-layer]').forEach(btn => {
   btn.addEventListener('click', () => switchTileLayer(btn.dataset.layer));
 });
 
