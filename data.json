@@ -1,0 +1,228 @@
+[
+  {
+    "id": "mmqix50adfo3s",
+    "name": "Mission Peak via Ohlone College",
+    "date": "2025-11-15",
+    "status": "completed",
+    "distance": "5.8",
+    "elevation": "2100",
+    "duration": "3h 15m",
+    "difficulty": "hard",
+    "rating": 4,
+    "tags": [
+      "bay-area",
+      "peak",
+      "out-and-back",
+      "views"
+    ],
+    "weather": "Clear, 58°F, windy at summit",
+    "companions": "with Alex",
+    "notes": "The final push to the summit pole was brutal but the 360° view was worth it. Could see SF, the bay bridges, and all the way to the Sierra on a clear day.",
+    "photos": [],
+    "coords": [
+      [
+        37.5073,
+        -121.8816
+      ],
+      [
+        37.5065,
+        -121.8798
+      ],
+      [
+        37.5048,
+        -121.8775
+      ],
+      [
+        37.5035,
+        -121.8752
+      ],
+      [
+        37.5019,
+        -121.8731
+      ],
+      [
+        37.4997,
+        -121.8708
+      ],
+      [
+        37.4978,
+        -121.8683
+      ],
+      [
+        37.4963,
+        -121.8656
+      ],
+      [
+        37.4951,
+        -121.8627
+      ],
+      [
+        37.4942,
+        -121.8594
+      ],
+      [
+        37.4938,
+        -121.8559
+      ],
+      [
+        37.4941,
+        -121.8523
+      ],
+      [
+        37.4948,
+        -121.8487
+      ],
+      [
+        37.4959,
+        -121.8453
+      ],
+      [
+        37.4972,
+        -121.8424
+      ]
+    ]
+  },
+  {
+    "id": "mmqix50a5kr71",
+    "name": "Tilden Park: Wildcat Peak",
+    "date": "2025-12-01",
+    "status": "completed",
+    "distance": "3.2",
+    "elevation": "780",
+    "duration": "1h 45m",
+    "difficulty": "moderate",
+    "rating": 5,
+    "tags": [
+      "bay-area",
+      "loop",
+      "berkeley-hills",
+      "wildflowers"
+    ],
+    "weather": "Overcast, 52°F, light drizzle",
+    "companions": "solo",
+    "notes": "Perfect quick escape from campus. The eucalyptus grove smells incredible after rain. Spotted a red-tailed hawk circling above the peak.",
+    "photos": [],
+    "coords": [
+      [
+        37.9052,
+        -122.2446
+      ],
+      [
+        37.9061,
+        -122.2431
+      ],
+      [
+        37.9074,
+        -122.2412
+      ],
+      [
+        37.9088,
+        -122.2397
+      ],
+      [
+        37.9098,
+        -122.2378
+      ],
+      [
+        37.9112,
+        -122.2361
+      ],
+      [
+        37.9125,
+        -122.2348
+      ],
+      [
+        37.9139,
+        -122.2336
+      ],
+      [
+        37.9148,
+        -122.2318
+      ],
+      [
+        37.9157,
+        -122.2301
+      ],
+      [
+        37.9162,
+        -122.2283
+      ]
+    ]
+  },
+  {
+    "id": "mmqix50aq8sla",
+    "name": "Point Reyes: Tomales Point Trail",
+    "date": "",
+    "status": "wishlist",
+    "distance": "9.4",
+    "elevation": "900",
+    "duration": "",
+    "difficulty": "moderate",
+    "rating": 0,
+    "tags": [
+      "marin",
+      "coastal",
+      "out-and-back",
+      "elk",
+      "wildflowers"
+    ],
+    "weather": "",
+    "companions": "",
+    "notes": "Heard this is amazing in spring with wildflowers + tule elk. Need to time it for a clear day.",
+    "photos": [],
+    "coords": [
+      [
+        38.1182,
+        -122.9553
+      ],
+      [
+        38.1215,
+        -122.9571
+      ],
+      [
+        38.1249,
+        -122.9598
+      ],
+      [
+        38.1281,
+        -122.9622
+      ],
+      [
+        38.1318,
+        -122.9641
+      ],
+      [
+        38.1357,
+        -122.9663
+      ],
+      [
+        38.1392,
+        -122.9678
+      ],
+      [
+        38.1431,
+        -122.9701
+      ],
+      [
+        38.1468,
+        -122.9717
+      ],
+      [
+        38.1503,
+        -122.9738
+      ],
+      [
+        38.1541,
+        -122.9751
+      ],
+      [
+        38.1578,
+        -122.9769
+      ],
+      [
+        38.1612,
+        -122.9789
+      ]
+    ]
+  }
+]
