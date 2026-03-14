@@ -460,46 +460,78 @@ img.leaflet-tile { image-rendering: auto; }
 .token-banner-dismiss:hover { background: #f5e0cc; }
 
 /* Mobile floating action buttons — hidden on desktop */
-.mobile-fab-group {
+.mobile-fab-group { display: none; }
+
+/* Mobile bottom tab bar — hidden on desktop */
+.mobile-tabs {
   display: none;
   position: fixed;
-  bottom: 24px;
-  right: 16px;
-  z-index: 1000;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.mobile-fab {
-  width: 52px; height: 52px;
-  border-radius: 16px;
-  border: 1px solid var(--border);
+  bottom: 0; left: 0; right: 0;
+  z-index: 2000;
   background: var(--bg-panel);
-  color: var(--text);
-  font-size: 24px;
-  cursor: pointer;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-  display: flex; align-items: center; justify-content: center;
+  border-top: 1px solid var(--border);
+  padding: 6px 20px;
+  padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+  justify-content: space-around;
+  align-items: center;
 }
 
-.mobile-fab.fab-add {
+.mobile-tab {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 2px; border: none; background: none;
+  color: var(--text-muted); font-family: inherit;
+  cursor: pointer; padding: 6px 16px;
+  border-radius: 10px; transition: all 0.15s;
+}
+
+.mobile-tab.active {
+  color: var(--accent);
+}
+
+.mobile-tab-icon { font-size: 20px; line-height: 1; }
+.mobile-tab-label { font-size: 10px; font-weight: 500; letter-spacing: 0.3px; }
+
+.mobile-tab-add {
+  width: 50px; height: 50px;
+  border-radius: 50%;
+  border: none;
   background: var(--accent);
-  border-color: var(--accent);
   color: #fff;
   font-size: 28px;
-  width: 56px; height: 56px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(199, 98, 58, 0.35);
+  margin-top: -18px;
+  transition: transform 0.15s;
 }
 
+.mobile-tab-add:active { transform: scale(0.92); }
+
 @media (max-width: 800px) {
+  /* Tab bar layout: map and sidebar are both full screen, toggled by tabs */
+  .mobile-tabs { display: flex; }
+  .sidebar-toggle { display: none !important; }
+
   .sidebar {
-    position: fixed; left: 0; top: 0; bottom: 0;
+    position: fixed; left: 0; top: 0; right: 0;
+    bottom: 56px; /* room for tab bar */
     z-index: 1500; width: 100%; min-width: unset;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
   }
-  .sidebar.hidden { transform: translateX(-100%); }
-  .sidebar-toggle { display: flex; }
-  .detail-panel { width: 100%; }
-  .map-controls { top: 12px; right: 56px; }
-  .mobile-fab-group { display: flex; }
+
+  .sidebar.mobile-visible {
+    transform: translateX(0);
+  }
+
+  /* Map fills screen above tab bar */
+  #map { position: fixed; top: 0; left: 0; right: 0; bottom: 56px; }
+
+  /* Map controls */
+  .map-controls { top: 12px; right: 12px; }
+
+  /* Detail panel above tab bar */
+  .detail-panel { bottom: 56px; }
 
   /* Larger tap targets everywhere */
   .chip { font-size: 13px; padding: 8px 14px; }
@@ -511,7 +543,7 @@ img.leaflet-tile { image-rendering: auto; }
 
   /* Bigger search box */
   .search-box { border-radius: 12px; }
-  .search-box input { font-size: 15px; padding: 12px 10px; }
+  .search-box input { font-size: 16px; padding: 12px 10px; }
 
   /* Trail cards easier to tap */
   .trail-card { padding: 14px 16px; margin-bottom: 6px; }
@@ -524,9 +556,7 @@ img.leaflet-tile { image-rendering: auto; }
   /* Sidebar header */
   .sidebar-header { padding: 20px 16px 16px; }
   .sidebar-header h1 { font-size: 24px; }
-
-  /* Close button for sidebar on mobile */
-  .mobile-close-sidebar { display: flex !important; }
+  .mobile-close-sidebar { display: none !important; }
 
   /* Controls */
   .controls { padding: 12px 16px; }
@@ -539,13 +569,10 @@ img.leaflet-tile { image-rendering: auto; }
   .map-controls { padding: 5px; border-radius: 12px; }
   .map-controls button { font-size: 13px; padding: 8px 14px; border-radius: 9px; }
 
-  /* Sidebar toggle bigger */
-  .sidebar-toggle { width: 48px; height: 48px; font-size: 22px; border-radius: 12px; }
-
   /* Detail panel */
   .detail-header { padding: 20px 16px; }
   .detail-header h2 { font-size: 22px; }
-  .detail-body { padding: 16px; }
+  .detail-body { padding: 16px; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
   .detail-actions button { width: 40px; height: 40px; font-size: 18px; border-radius: 10px; }
   .detail-stat { padding: 12px 14px; }
   .detail-stat .value { font-size: 16px; }
@@ -554,7 +581,7 @@ img.leaflet-tile { image-rendering: auto; }
   .detail-section p { font-size: 14px; }
 
   /* Modal */
-  .modal { border-radius: 16px 16px 0 0; max-height: 95vh; margin-top: auto; }
+  .modal { border-radius: 16px 16px 0 0; max-height: 92vh; margin-top: auto; }
   .modal-header { padding: 20px 20px 0; }
   .modal-header h2 { font-size: 20px; }
   .modal-close { width: 36px; height: 36px; font-size: 20px; }
@@ -564,7 +591,7 @@ img.leaflet-tile { image-rendering: auto; }
     font-size: 16px; padding: 12px 14px; border-radius: 10px;
   }
   .form-group .star-input span { font-size: 30px; }
-  .modal-footer { padding: 0 20px 20px; }
+  .modal-footer { padding: 0 20px 20px; padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); }
   .modal-footer .btn { padding: 14px 20px; font-size: 14px; }
 
   /* GPX drop zone more tappable */
@@ -577,18 +604,12 @@ img.leaflet-tile { image-rendering: auto; }
   .token-banner-actions .btn { padding: 10px 16px !important; font-size: 13px !important; }
   .token-banner-dismiss { width: 32px; height: 32px; font-size: 16px; }
 
-  /* Filter badge */
-  .filter-badge { font-size: 13px; padding: 8px 18px; bottom: 16px; }
-}
+  /* Filter badge above tab bar */
+  .filter-badge { bottom: 72px; font-size: 13px; padding: 8px 18px; }
 
-/* iPhone safe areas */
-@supports (padding-bottom: env(safe-area-inset-bottom)) {
-  @media (max-width: 800px) {
-    .sidebar-actions { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
-    .modal-footer { padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
-    .detail-body { padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
-    .mobile-fab-group { bottom: calc(24px + env(safe-area-inset-bottom)); }
-    .filter-badge { bottom: calc(16px + env(safe-area-inset-bottom)); }
+  /* Adjust tab bar bottom for safe area */
+  .mobile-tabs {
+    padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
   }
 }
 </style>
@@ -669,10 +690,17 @@ img.leaflet-tile { image-rendering: auto; }
 
   <div class="filter-badge" id="filterBadge"></div>
 
-  <!-- Mobile floating buttons -->
-  <div class="mobile-fab-group">
-    <button class="mobile-fab fab-list" id="fabList" onclick="document.getElementById('sidebar').classList.remove('hidden')" title="Trail list">☰</button>
-    <button class="mobile-fab fab-add" onclick="openAddModal()" title="Add trail">+</button>
+  <!-- Mobile bottom tab bar -->
+  <div class="mobile-tabs" id="mobileTabs">
+    <button class="mobile-tab active" data-tab="map" onclick="switchMobileTab('map')">
+      <span class="mobile-tab-icon">🗺</span>
+      <span class="mobile-tab-label">Map</span>
+    </button>
+    <button class="mobile-tab-add" onclick="openAddModal()">+</button>
+    <button class="mobile-tab" data-tab="list" onclick="switchMobileTab('list')">
+      <span class="mobile-tab-icon">☰</span>
+      <span class="mobile-tab-label">Trails</span>
+    </button>
   </div>
 </div>
 
@@ -1327,8 +1355,8 @@ function openDetail(id) {
   if (t.photos&&t.photos.length) h+=`<div class="detail-section"><h3>Photos</h3><div class="detail-photos">${t.photos.map(u=>`<img src="${u}" onerror="this.style.display='none'" loading="lazy">`).join('')}</div></div>`;
   document.getElementById('detailBody').innerHTML = h;
   document.getElementById('detailPanel').classList.add('open');
-  // On mobile, close sidebar so user sees the map + detail panel
-  if (window.innerWidth <= 800) document.getElementById('sidebar').classList.add('hidden');
+  // On mobile, switch to map tab so user sees the trail
+  if (window.innerWidth <= 800) switchMobileTab('map');
   if (t.coords&&t.coords.length) focusTrail(id);
 }
 
@@ -1367,25 +1395,26 @@ function importData(e) {
   reader.readAsText(file); e.target.value='';
 }
 
-// ===== SIDEBAR TOGGLE =====
-function updateMobileUI() {
-  if (window.innerWidth > 800) return;
-  const hidden = document.getElementById('sidebar').classList.contains('hidden');
-  const fabs = document.getElementById('fabList')?.closest('.mobile-fab-group');
-  const toggle = document.getElementById('sidebarToggle');
-  if (fabs) fabs.style.display = hidden ? 'flex' : 'none';
-  if (toggle) toggle.style.display = hidden ? 'flex' : 'none';
+// ===== MOBILE TAB NAVIGATION =====
+function switchMobileTab(tab) {
+  const sidebar = document.getElementById('sidebar');
+  const tabs = document.querySelectorAll('.mobile-tab');
+
+  tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+
+  if (tab === 'list') {
+    sidebar.classList.add('mobile-visible');
+  } else {
+    sidebar.classList.remove('mobile-visible');
+    // Refresh map size since it was hidden behind sidebar
+    setTimeout(() => map.invalidateSize(), 300);
+  }
 }
 
-document.getElementById('sidebarToggle').addEventListener('click', () => {
+// Desktop sidebar toggle (only used on desktop)
+document.getElementById('sidebarToggle')?.addEventListener('click', () => {
   document.getElementById('sidebar').classList.toggle('hidden');
-  updateMobileUI();
 });
-
-// Also update when sidebar is closed via the X button or trail tap
-new MutationObserver(updateMobileUI).observe(
-  document.getElementById('sidebar'), { attributes: true, attributeFilter: ['class'] }
-);
 
 // ===== INIT =====
 loadTrails(); initMap();
@@ -1399,12 +1428,6 @@ if (trails.length === 0) {
   saveLocal();
 }
 renderList(); renderMap();
-
-// On mobile, start with map visible (sidebar hidden)
-if (window.innerWidth <= 800) {
-  document.getElementById('sidebar').classList.add('hidden');
-  updateMobileUI();
-}
 
 // Pull from GitHub on load (non-blocking)
 syncFromGitHub();
