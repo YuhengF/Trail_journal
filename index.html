@@ -997,7 +997,7 @@ const SYNC_CONFIG_KEY = 'trail_journal_sync';
 const TOMBSTONE_KEY = 'trail_journal_tombstones';
 let trails = [];
 let editingId = null, selectedId = null, currentRating = 0, gpxTrackData = null, gpxSpeedData = null;
-let trailsVisible = true, focusedTrailId = null;
+let trailsVisible = true, focusedTrailId = null, savedMapView = null;
 let syncPending = false;
 let ghSha = null;
 
@@ -1483,6 +1483,7 @@ function renderMap() {
 function focusTrail(id) {
   const layer = trailLayers[id];
   if (layer) {
+    if (!savedMapView) savedMapView = { center: map.getCenter(), zoom: map.getZoom() };
     map.fitBounds(layer.hitArea.getBounds(), { padding: [80, 80], maxZoom: 15 });
     Object.entries(trailLayers).forEach(([tid, l]) => {
       const f = tid === id;
@@ -1897,7 +1898,11 @@ function openEditModal(id) {
   document.getElementById('modalOverlay').classList.add('open');
 }
 
-function closeModal(e) { if (e && e.target !== e.currentTarget) return; document.getElementById('modalOverlay').classList.remove('open'); }
+function closeModal(e) {
+  if (e && e.target !== e.currentTarget) return;
+  document.getElementById('modalOverlay').classList.remove('open');
+  if (window.innerWidth <= 800) switchMobileTab('list');
+}
 
 function clearForm() {
   ['fName','fDate','fDistance','fElevation','fDuration','fTags','fWeather','fCompanions','fNotes','fPhotos','fCoords'].forEach(id => document.getElementById(id).value = '');
@@ -2005,7 +2010,12 @@ function openDetail(id) {
   if (t.coords&&t.coords.length) focusTrail(id);
 }
 
-function closeDetail() { document.getElementById('detailPanel').classList.remove('open'); selectedId=null; focusedTrailId=null; map.closePopup(); resetMapHighlight(); renderList(); }
+function closeDetail() {
+  document.getElementById('detailPanel').classList.remove('open');
+  selectedId = null; focusedTrailId = null;
+  map.closePopup(); resetMapHighlight(); renderList();
+  if (savedMapView) { map.setView(savedMapView.center, savedMapView.zoom); savedMapView = null; }
+}
 function editTrail() {
   const id = selectedId;
   if (id) { closeDetail(); openEditModal(id); }
@@ -2186,6 +2196,7 @@ map.on('click', (e) => {
     selectedId = null;
     resetMapHighlight();
     renderList();
+    if (savedMapView) { map.setView(savedMapView.center, savedMapView.zoom); savedMapView = null; }
   }
 });
 renderList(); renderMap();
