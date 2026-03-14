@@ -1540,42 +1540,64 @@ function toggleTrailVisibility() {
 // ===== GPX PARSER =====
 function parseGPX(xmlStr) {
   const doc = new DOMParser().parseFromString(xmlStr, 'text/xml');
-  const coords = [], elevations = [], times = [];
-  let pts = doc.querySelectorAll('trkpt');
-  if (!pts.length) pts = doc.querySelectorAll('rtept');
-  if (!pts.length) pts = doc.querySelectorAll('wpt');
-  pts.forEach(pt => {
+  const coords = [], elevations = [], times = [], rawSpeeds = [];
+  function xmlFind(el, tag) { return el.getElementsByTagName(tag)[0] || el.querySelector(tag); }
+  let pts = doc.getElementsByTagName('trkpt');
+  if (!pts.length) pts = doc.getElementsByTagName('rtept');
+  if (!pts.length) pts = doc.getElementsByTagName('wpt');
+  for (let k = 0; k < pts.length; k++) {
+    const pt = pts[k];
     const lat = parseFloat(pt.getAttribute('lat')), lon = parseFloat(pt.getAttribute('lon'));
     if (!isNaN(lat) && !isNaN(lon)) {
       coords.push([lat, lon]);
-      const ele = pt.querySelector('ele');
+      const ele = xmlFind(pt, 'ele');
       if (ele) elevations.push(parseFloat(ele.textContent));
-      const timeEl = pt.querySelector('time');
-      times.push(timeEl ? new Date(timeEl.textContent).getTime() : null);
+      const timeEl = xmlFind(pt, 'time');
+      times.push(timeEl ? new Date(timeEl.textContent.trim()).getTime() : null);
+      const speedEl = xmlFind(pt, 'speed');
+      rawSpeeds.push(speedEl ? parseFloat(speedEl.textContent) : null);
     }
-  });
+  }
   let dist = 0;
   for (let i = 1; i < coords.length; i++) dist += haversine(coords[i-1], coords[i]);
   let gain = 0;
   for (let i = 1; i < elevations.length; i++) { const d = elevations[i]-elevations[i-1]; if (d > 0) gain += d; }
-  const nameEl = doc.querySelector('name');
+  const nameEl = doc.getElementsByTagName('name')[0];
   let speedData = null;
   const CHUNK = 10;
-  const validTimes = times.filter(t => t !== null).length;
-  if (validTimes > coords.length * 0.5 && coords.length > 2) {
+  // Method 1: direct speed values from GPX extensions (m/s → km/h)
+  const validSpeeds = rawSpeeds.filter(s => s !== null && !isNaN(s)).length;
+  if (validSpeeds > coords.length * 0.3 && coords.length > 2) {
     const speeds = [];
-    for (let i = 0; i < coords.length - 1; i += CHUNK) {
-      const end = Math.min(i + CHUNK, coords.length - 1);
-      let segDist = 0;
-      for (let j = i; j < end; j++) segDist += haversine(coords[j], coords[j + 1]);
-      const t0 = times[i], t1 = times[end];
-      if (t0 && t1 && t1 > t0) {
-        speeds.push(Math.round((segDist / ((t1 - t0) / 3600000)) * 10) / 10);
+    for (let i = 0; i < coords.length; i += CHUNK) {
+      const end = Math.min(i + CHUNK, coords.length);
+      const chunk = rawSpeeds.slice(i, end).filter(s => s !== null && !isNaN(s));
+      if (chunk.length > 0) {
+        speeds.push(Math.round((chunk.reduce((a, b) => a + b, 0) / chunk.length) * 3.6 * 10) / 10);
       } else {
         speeds.push(null);
       }
     }
     if (speeds.some(s => s !== null)) speedData = { chunkSize: CHUNK, speeds };
+  }
+  // Method 2: compute from time/distance if no direct speed
+  if (!speedData) {
+    const validTimes = times.filter(t => t !== null && !isNaN(t)).length;
+    if (validTimes > coords.length * 0.5 && coords.length > 2) {
+      const speeds = [];
+      for (let i = 0; i < coords.length - 1; i += CHUNK) {
+        const end = Math.min(i + CHUNK, coords.length - 1);
+        let segDist = 0;
+        for (let j = i; j < end; j++) segDist += haversine(coords[j], coords[j + 1]);
+        const t0 = times[i], t1 = times[end];
+        if (t0 && t1 && !isNaN(t0) && !isNaN(t1) && t1 > t0) {
+          speeds.push(Math.round((segDist / ((t1 - t0) / 3600000)) * 10) / 10);
+        } else {
+          speeds.push(null);
+        }
+      }
+      if (speeds.some(s => s !== null)) speedData = { chunkSize: CHUNK, speeds };
+    }
   }
   return { coords, distance: (dist*0.621371).toFixed(1), elevation: Math.round(gain*3.28084), name: nameEl ? nameEl.textContent : '', speedData };
 }
