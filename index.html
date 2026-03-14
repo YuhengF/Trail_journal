@@ -797,11 +797,13 @@ img.leaflet-tile { image-rendering: auto; }
         • The token never leaves your browser. Each device needs its own token entry.
       </p>
       <div id="syncTestResult"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="testSync()" id="testSyncBtn">Test Connection</button>
-      <button class="btn" onclick="clearSyncConfig()">Disconnect</button>
-      <button class="btn primary" onclick="saveSyncConfig()">Save</button>
+
+      <!-- Buttons inside scrollable area so they're never hidden by browser chrome -->
+      <div style="display:flex;gap:8px;margin-top:16px;padding-bottom:40px;">
+        <button class="btn" onclick="testSync()" id="testSyncBtn" style="flex:1">Test Connection</button>
+        <button class="btn" onclick="clearSyncConfig()" style="flex:1">Disconnect</button>
+        <button class="btn primary" onclick="saveSyncConfig()" style="flex:1">Save</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1105,7 +1107,7 @@ function switchTileLayer(name) {
 }
 
 function renderMap() {
-  Object.values(trailLayers).forEach(l => { map.removeLayer(l.line); map.removeLayer(l.outline); });
+  Object.values(trailLayers).forEach(l => { map.removeLayer(l.line); map.removeLayer(l.outline); map.removeLayer(l.hitArea); });
   trailLayers = {};
   const filtered = getFilteredTrails();
   const filteredIds = new Set(filtered.map(t => t.id));
@@ -1115,13 +1117,15 @@ function renderMap() {
     if (!t.coords || t.coords.length < 2) return;
     if (!filteredIds.has(t.id)) return;
     const color = getTrailColor(i);
+    // Wide invisible hit area for easy clicking/tapping (30px wide)
+    const hitArea = L.polyline(t.coords, { color: 'transparent', weight: 30, opacity: 0, smoothFactor: 1, interactive: true }).addTo(map);
     // Dark outline for contrast against any map background
     const outline = L.polyline(t.coords, { color: '#1a1a1e', weight: 8, opacity: 0.5, smoothFactor: 1, interactive: false }).addTo(map);
     // Colored trail on top
-    const polyline = L.polyline(t.coords, { color, weight: 5, opacity: 1, smoothFactor: 1 }).addTo(map);
-    polyline.bindPopup(`<div class="trail-popup"><h3>${t.name}</h3><div class="popup-meta">${t.date || ''} ${t.distance ? '· '+t.distance+' mi':''} ${t.elevation ? '· '+t.elevation+' ft':''}<br><span style="color:${t.status==='wishlist'?'var(--wishlist)':'var(--green)'}">${t.status==='wishlist'?'★ Wishlist':'✓ Completed'}</span></div></div>`);
-    polyline.on('click', () => openDetail(t.id));
-    trailLayers[t.id] = { line: polyline, outline };
+    const polyline = L.polyline(t.coords, { color, weight: 5, opacity: 1, smoothFactor: 1, interactive: false }).addTo(map);
+    hitArea.bindPopup(`<div class="trail-popup"><h3>${t.name}</h3><div class="popup-meta">${t.date || ''} ${t.distance ? '· '+t.distance+' mi':''} ${t.elevation ? '· '+t.elevation+' ft':''}<br><span style="color:${t.status==='wishlist'?'var(--wishlist)':'var(--green)'}">${t.status==='wishlist'?'★ Wishlist':'✓ Completed'}</span></div></div>`);
+    hitArea.on('click', () => openDetail(t.id));
+    trailLayers[t.id] = { line: polyline, outline, hitArea };
     t.coords.forEach(c => bounds.push(c));
   });
 
@@ -1187,7 +1191,7 @@ function renderList() {
   let filtered = getFilteredTrails();
   filtered.sort((a,b) => { if (a.status !== b.status) return a.status==='completed'?-1:1; if (a.date&&b.date) return b.date.localeCompare(a.date); return 0; });
   list.innerHTML = filtered.length === 0
-    ? `<div style="text-align:center;padding:40px 20px;color:var(--text-muted);font-size:13px;">${trails.length===0?'No trails yet — add your first one!':'No matches found.'}</div>`
+    ? `<div style="text-align:center;padding:40px 20px;color:var(--text-muted);font-size:13px;line-height:1.6;">${trails.length===0?'No trails yet.<br><br>Tap <strong style="color:var(--accent)">+ Add Trail</strong> to log your first hike,<br>or set up <strong>⚙ Sync</strong> to pull data from another device.':'No matches found.'}</div>`
     : filtered.map(t => {
       const color = getTrailColor(trails.indexOf(t));
       return `<div class="trail-card ${selectedId===t.id?'selected':''}" onclick="openDetail('${t.id}')">
@@ -1418,15 +1422,6 @@ document.getElementById('sidebarToggle')?.addEventListener('click', () => {
 
 // ===== INIT =====
 loadTrails(); initMap();
-
-if (trails.length === 0) {
-  trails = [
-    { id:genId(), name:"Mission Peak via Ohlone College", date:"2025-11-15", status:"completed", distance:"5.8", elevation:"2100", duration:"3h 15m", difficulty:"hard", rating:4, tags:["bay-area","peak","out-and-back","views"], weather:"Clear, 58°F, windy at summit", companions:"with Alex", notes:"The final push to the summit pole was brutal but the 360° view was worth it. Could see SF, the bay bridges, and all the way to the Sierra on a clear day.", photos:[], coords:[[37.5073,-121.8816],[37.5065,-121.8798],[37.5048,-121.8775],[37.5035,-121.8752],[37.5019,-121.8731],[37.4997,-121.8708],[37.4978,-121.8683],[37.4963,-121.8656],[37.4951,-121.8627],[37.4942,-121.8594],[37.4938,-121.8559],[37.4941,-121.8523],[37.4948,-121.8487],[37.4959,-121.8453],[37.4972,-121.8424]] },
-    { id:genId(), name:"Tilden Park: Wildcat Peak", date:"2025-12-01", status:"completed", distance:"3.2", elevation:"780", duration:"1h 45m", difficulty:"moderate", rating:5, tags:["bay-area","loop","berkeley-hills","wildflowers"], weather:"Overcast, 52°F, light drizzle", companions:"solo", notes:"Perfect quick escape from campus. The eucalyptus grove smells incredible after rain. Spotted a red-tailed hawk circling above the peak.", photos:[], coords:[[37.9052,-122.2446],[37.9061,-122.2431],[37.9074,-122.2412],[37.9088,-122.2397],[37.9098,-122.2378],[37.9112,-122.2361],[37.9125,-122.2348],[37.9139,-122.2336],[37.9148,-122.2318],[37.9157,-122.2301],[37.9162,-122.2283]] },
-    { id:genId(), name:"Point Reyes: Tomales Point Trail", date:"", status:"wishlist", distance:"9.4", elevation:"900", duration:"", difficulty:"moderate", rating:0, tags:["marin","coastal","out-and-back","elk","wildflowers"], weather:"", companions:"", notes:"Heard this is amazing in spring with wildflowers + tule elk. Need to time it for a clear day.", photos:[], coords:[[38.1182,-122.9553],[38.1215,-122.9571],[38.1249,-122.9598],[38.1281,-122.9622],[38.1318,-122.9641],[38.1357,-122.9663],[38.1392,-122.9678],[38.1431,-122.9701],[38.1468,-122.9717],[38.1503,-122.9738],[38.1541,-122.9751],[38.1578,-122.9769],[38.1612,-122.9789]] }
-  ];
-  saveLocal();
-}
 renderList(); renderMap();
 
 // Pull from GitHub on load (non-blocking)
