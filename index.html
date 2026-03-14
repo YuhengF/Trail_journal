@@ -499,6 +499,34 @@ body {
   .trim-panel-actions .btn { padding: 12px; font-size: 14px; }
 }
 
+/* UNDO TOAST */
+.undo-toast {
+  position: fixed;
+  bottom: 24px; left: 50%;
+  transform: translateX(-50%) translateY(calc(100% + 40px));
+  z-index: 3000;
+  background: #2c2a26; color: #f5f2ed;
+  border-radius: var(--radius);
+  padding: 12px 10px 12px 16px;
+  display: flex; align-items: center; gap: 12px;
+  font-size: 13px;
+  box-shadow: var(--shadow-lg);
+  opacity: 0; pointer-events: none;
+  transition: transform 0.3s cubic-bezier(0.34, 1.2, 0.64, 1), opacity 0.2s;
+}
+.undo-toast.visible {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1; pointer-events: auto;
+}
+.undo-toast span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+.undo-toast button {
+  background: none; border: 1px solid rgba(199,98,58,0.4);
+  color: #e8955a; font-family: inherit; font-size: 12px;
+  font-weight: 600; cursor: pointer; padding: 5px 12px;
+  border-radius: 6px; white-space: nowrap;
+}
+.undo-toast button:hover { background: rgba(199,98,58,0.15); }
+
 /* MAP POPUP */
 .trail-popup { font-family: 'DM Sans', sans-serif; }
 .trail-popup h3 { font-family: 'DM Serif Display', serif; font-size: 15px; margin-bottom: 4px; }
@@ -749,6 +777,9 @@ img.leaflet-tile { image-rendering: auto; }
   /* Filter badge above tab bar */
   .filter-badge { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); font-size: 13px; padding: 8px 18px; }
 
+  /* Undo toast above tab bar */
+  .undo-toast { bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+
   /* Adjust tab bar bottom for safe area */
   .mobile-tabs {
     padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
@@ -846,6 +877,12 @@ img.leaflet-tile { image-rendering: auto; }
       <span class="mobile-tab-icon">☰</span>
       <span class="mobile-tab-label">Trails</span>
     </button>
+  </div>
+
+  <!-- UNDO TOAST -->
+  <div class="undo-toast" id="undoToast">
+    <span id="undoTrailName">Trail deleted</span>
+    <button onclick="undoDelete()">Undo</button>
   </div>
 </div>
 
@@ -1008,8 +1045,41 @@ const TRAIL_COLORS = [
 ];
 
 // ===== LOCAL STORAGE =====
-function loadTrails() { try { trails = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { trails = []; } }
-function saveLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(trails)); }
+function compressGpxTimes(times) {
+  if (!times || !Array.isArray(times) || times.length === 0) return null;
+  const valid = times.filter(t => t !== null && !isNaN(t));
+  if (valid.length === 0) return null;
+  const base = valid[0];
+  return { b: base, o: times.map(t => (t !== null && !isNaN(t)) ? Math.round((t - base) / 1000) : null) };
+}
+
+function decompressGpxTimes(data) {
+  if (!data) return null;
+  if (Array.isArray(data)) return data;
+  if (data.b !== undefined && data.o) return data.o.map(off => off !== null ? data.b + off * 1000 : null);
+  return null;
+}
+
+function compressTrailForStorage(t) {
+  const out = { ...t };
+  if (out.gpxTimes && Array.isArray(out.gpxTimes)) out.gpxTimes = compressGpxTimes(out.gpxTimes);
+  if (out.coords) out.coords = out.coords.map(c => [Math.round(c[0]*1e6)/1e6, Math.round(c[1]*1e6)/1e6]);
+  return out;
+}
+
+function loadTrails() {
+  try {
+    trails = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    trails.forEach(t => {
+      if (t.gpxTimes) t.gpxTimes = decompressGpxTimes(t.gpxTimes);
+      if (t.coords) t.coords = t.coords.map(c => [Math.round(c[0]*1e6)/1e6, Math.round(c[1]*1e6)/1e6]);
+    });
+  } catch { trails = []; }
+}
+
+function saveLocal() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(trails.map(compressTrailForStorage)));
+}
 function genId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
 function getTrailColor(i) { return TRAIL_COLORS[i % TRAIL_COLORS.length]; }
 
@@ -1281,6 +1351,10 @@ async function syncFromGitHub() {
       }
 
       trails = merged;
+      trails.forEach(t => {
+        if (t.gpxTimes) t.gpxTimes = decompressGpxTimes(t.gpxTimes);
+        if (t.coords) t.coords = t.coords.map(c => [Math.round(c[0]*1e6)/1e6, Math.round(c[1]*1e6)/1e6]);
+      });
       saveLocal();
       renderList();
       renderMap();
@@ -1314,8 +1388,7 @@ async function syncToGitHub() {
   updateSyncStatus('pending', 'Pushing to GitHub...');
 
   try {
-    // New format: { trails, tombstones }
-    const payload = { trails, tombstones: getTombstones() };
+    const payload = { trails: trails.map(compressTrailForStorage), tombstones: getTombstones() };
     const content = btoa(unescape(encodeURIComponent(JSON.stringify(payload, null, 2))));
     const body = {
       message: `Update trails — ${new Date().toISOString().split('T')[0]}`,
@@ -1558,7 +1631,7 @@ function parseGPX(xmlStr) {
   if (!pts.length) pts = doc.getElementsByTagName('wpt');
   for (let k = 0; k < pts.length; k++) {
     const pt = pts[k];
-    const lat = parseFloat(pt.getAttribute('lat')), lon = parseFloat(pt.getAttribute('lon'));
+    const lat = Math.round(parseFloat(pt.getAttribute('lat'))*1e6)/1e6, lon = Math.round(parseFloat(pt.getAttribute('lon'))*1e6)/1e6;
     if (!isNaN(lat) && !isNaN(lon)) {
       coords.push([lat, lon]);
       const ele = xmlFind(pt, 'ele');
@@ -1610,14 +1683,15 @@ function parseGPX(xmlStr) {
       if (speeds.some(s => s !== null)) speedData = { chunkSize: CHUNK, speeds };
     }
   }
-  let duration = null, startDate = null;
+  let duration = null, startDate = null, timeRange = null;
   const validTimestamps = times.filter(t => t !== null && !isNaN(t));
   if (validTimestamps.length >= 2) {
     startDate = new Date(validTimestamps[0]);
     const durationMs = validTimestamps[validTimestamps.length - 1] - validTimestamps[0];
     if (durationMs > 0) duration = formatDuration(durationMs);
+    timeRange = formatTimeRange(validTimestamps[0], validTimestamps[validTimestamps.length - 1]);
   }
-  return { coords, distance: (dist*0.621371).toFixed(1), elevation: Math.round(gain*3.28084), name: nameEl ? nameEl.textContent : '', speedData, times, duration, startDate };
+  return { coords, distance: (dist*0.621371).toFixed(1), elevation: Math.round(gain*3.28084), name: nameEl ? nameEl.textContent : '', speedData, times, duration, startDate, timeRange };
 }
 
 function haversine([lat1,lon1],[lat2,lon2]) {
@@ -1660,6 +1734,26 @@ function durationFromTimes(timesArr, startIdx, endIdx) {
   if (valid.length < 2) return null;
   const ms = valid[valid.length - 1] - valid[0];
   return ms > 0 ? formatDuration(ms) : null;
+}
+
+function formatTimeRange(startMs, endMs) {
+  const fmt = (ms) => {
+    const d = new Date(ms);
+    let h = d.getHours();
+    const m = d.getMinutes();
+    const ampm = h >= 12 ? 'p' : 'a';
+    h = h % 12 || 12;
+    return m > 0 ? `${h}:${String(m).padStart(2, '0')}${ampm}` : `${h}${ampm}`;
+  };
+  return `${fmt(startMs)} – ${fmt(endMs)}`;
+}
+
+function timeRangeFromTimes(timesArr, startIdx, endIdx) {
+  if (!timesArr || timesArr.length === 0) return null;
+  const slice = timesArr.slice(startIdx, endIdx);
+  const valid = slice.filter(t => t !== null && !isNaN(t));
+  if (valid.length < 2) return null;
+  return formatTimeRange(valid[0], valid[valid.length - 1]);
 }
 
 // ===== TRIM TRACK =====
@@ -1811,7 +1905,9 @@ function updateTrimUI() {
   const trimDurEl = document.getElementById('trimNewDuration');
   if (trimDurEl) {
     const trimDur = durationFromTimes(t.gpxTimes, start - 1, end);
-    trimDurEl.textContent = trimDur ? `, ${trimDur}` : '';
+    const trimRange = timeRangeFromTimes(t.gpxTimes, start - 1, end);
+    const parts = [trimDur, trimRange].filter(Boolean).join(', ');
+    trimDurEl.textContent = parts ? `, ${parts}` : '';
   }
   document.getElementById('trimApplyBtn').disabled = keepCount < 2;
 }
@@ -1842,6 +1938,8 @@ function applyTrim() {
     t.gpxTimes = t.gpxTimes.slice(start - 1, end);
     const newDuration = durationFromTimes(t.gpxTimes, 0, t.gpxTimes.length);
     if (newDuration) t.duration = newDuration;
+    const newRange = timeRangeFromTimes(t.gpxTimes, 0, t.gpxTimes.length);
+    if (newRange) t.timeRange = newRange;
   }
   t.updatedAt = Date.now();
   clearTrimPreview();
@@ -1869,7 +1967,7 @@ function renderList() {
               <span class="trail-name"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:6px;vertical-align:middle;"></span>${t.name}</span>
               <span class="trail-status ${t.status}">${t.status==='wishlist'?'★ Wishlist':'✓ Done'}</span>
             </div>
-            <div class="trail-meta">${t.date?`<span>${t.date}</span>`:''}${t.distance?`<span>${t.distance} mi</span>`:''}${t.elevation?`<span>${t.elevation} ft ↑</span>`:''}${t.duration?`<span>${t.duration}</span>`:''}${t.difficulty?`<span>${t.difficulty}</span>`:''}</div>
+            <div class="trail-meta">${t.date?`<span>${t.date}</span>`:''}${t.distance?`<span>${t.distance} mi</span>`:''}${t.elevation?`<span>${t.elevation} ft ↑</span>`:''}${t.duration?`<span>${t.duration}</span>`:''}${t.timeRange?`<span>${t.timeRange}</span>`:''}${t.difficulty?`<span>${t.difficulty}</span>`:''}</div>
             ${t.rating?`<div class="trail-rating">${'★'.repeat(t.rating)}${'☆'.repeat(5-t.rating)}</div>`:''}
             ${(t.tags&&t.tags.length)?`<div class="trail-tags">${t.tags.map(tg=>`<span class="trail-tag">${tg}</span>`).join('')}</div>`:''}
           </div>
@@ -1966,6 +2064,7 @@ function saveTrail() {
   if (!name) { document.getElementById('fName').focus(); return; }
   let coords = gpxTrackData;
   if (!coords) { try { const raw = document.getElementById('fCoords').value.trim(); if (raw) coords = JSON.parse(raw); } catch {} }
+  const timesArr = gpxTimesData || (editingId ? (trails.find(x => x.id === editingId)?.gpxTimes || null) : null);
   const trail = {
     id: editingId || genId(), name,
     date: document.getElementById('fDate').value,
@@ -1982,7 +2081,8 @@ function saveTrail() {
     photos: document.getElementById('fPhotos').value.trim().split('\n').filter(Boolean),
     coords,
     speedData: gpxSpeedData || (editingId ? (trails.find(x => x.id === editingId)?.speedData || null) : null),
-    gpxTimes: gpxTimesData || (editingId ? (trails.find(x => x.id === editingId)?.gpxTimes || null) : null),
+    gpxTimes: timesArr,
+    timeRange: timeRangeFromTimes(timesArr, 0, timesArr ? timesArr.length : 0),
     updatedAt: Date.now()
   };
   if (editingId) { const idx = trails.findIndex(t=>t.id===editingId); if (idx>=0) trails[idx]=trail; }
@@ -2012,6 +2112,7 @@ function bindGpxInput() {
 }
 
 function handleGPXFile(file) {
+  const fileName = file.name.replace(/\.gpx$/i, '');
   const fileDate = new Date(file.lastModified);
   const reader = new FileReader();
   reader.onload = e => {
@@ -2020,21 +2121,26 @@ function handleGPXFile(file) {
       gpxTrackData = r.coords;
       gpxSpeedData = r.speedData || null;
       gpxTimesData = r.times || null;
-      const trailDate = r.startDate || (fileDate && !isNaN(fileDate.getTime()) ? fileDate : null);
-      if (trailDate) {
-        document.getElementById('fDate').value = trailDate.toISOString().split('T')[0];
-      }
+
+      // Trail name: prefer GPX <name>, fall back to filename (without extension)
+      const trailName = r.name || fileName;
       if (!document.getElementById('fName').value) {
-        if (r.name) {
-          document.getElementById('fName').value = r.name;
-        } else if (trailDate) {
-          document.getElementById('fName').value = trailDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        }
+        document.getElementById('fName').value = trailName;
       }
+
+      // Date: prioritize YYYY-MM-DD from filename, then <name> tag, then file.lastModified
+      const dateFromFile = fileName.match(/(\d{4}-\d{2}-\d{2})/);
+      const dateFromName = r.name ? r.name.match(/(\d{4}-\d{2}-\d{2})/) : null;
+      let trailDateStr = null;
+      if (dateFromFile) trailDateStr = dateFromFile[1];
+      else if (dateFromName) trailDateStr = dateFromName[1];
+      else if (fileDate && !isNaN(fileDate.getTime())) trailDateStr = fileDate.toISOString().split('T')[0];
+      if (trailDateStr) document.getElementById('fDate').value = trailDateStr;
+
       if (r.distance) document.getElementById('fDistance').value = r.distance;
       if (r.elevation) document.getElementById('fElevation').value = r.elevation;
       if (r.duration) document.getElementById('fDuration').value = r.duration;
-      const extras = [r.duration, gpxSpeedData ? 'speed data' : ''].filter(Boolean).join(', ');
+      const extras = [r.timeRange, r.duration, gpxSpeedData ? 'speed data' : ''].filter(Boolean).join(', ');
       document.getElementById('gpxDrop').innerHTML = `<div style="color:var(--green)">✓ GPX loaded — ${r.coords.length} points, ${r.distance} mi, ${r.elevation} ft gain${extras ? ', ' + extras : ''}</div>`;
     } catch(err) { document.getElementById('gpxDrop').innerHTML = `<div style="color:#c0392b">Error: ${err.message}</div>`; }
   };
@@ -2052,6 +2158,7 @@ function openDetail(id) {
   if (t.distance) h+=`<div class="detail-stat"><div class="label">Distance</div><div class="value">${t.distance} mi</div></div>`;
   if (t.elevation) h+=`<div class="detail-stat"><div class="label">Elev. Gain</div><div class="value">${parseInt(t.elevation).toLocaleString()} ft</div></div>`;
   if (t.duration) h+=`<div class="detail-stat"><div class="label">Duration</div><div class="value">${t.duration}</div></div>`;
+  if (t.timeRange) h+=`<div class="detail-stat"><div class="label">Time</div><div class="value">${t.timeRange}</div></div>`;
   if (t.difficulty) h+=`<div class="detail-stat"><div class="label">Difficulty</div><div class="value" style="text-transform:capitalize">${t.difficulty}</div></div>`;
   if (t.status) h+=`<div class="detail-stat"><div class="label">Status</div><div class="value" style="color:${t.status==='wishlist'?'var(--wishlist)':'var(--green)'}">${t.status==='wishlist'?'★ Wishlist':'✓ Completed'}</div></div>`;
   if (t.rating) h+=`<div class="detail-stat"><div class="label">Rating</div><div class="value" style="color:var(--accent)">${'★'.repeat(t.rating)}${'☆'.repeat(5-t.rating)}</div></div>`;
@@ -2085,19 +2192,53 @@ function editTrail() {
   if (id) { closeDetail(); openEditModal(id); }
 }
 
+let pendingDelete = null;
+let undoTimer = null;
+
+function softDeleteTrail(id) {
+  if (pendingDelete) finalizeDelete();
+  const t = trails.find(x => x.id === id);
+  if (!t) return;
+  pendingDelete = { trail: JSON.parse(JSON.stringify(t)), id: t.id };
+  addTombstone(id);
+  trails = trails.filter(x => x.id !== id);
+  saveData(); renderList(); renderMap();
+  clearTimeout(undoTimer);
+  document.getElementById('undoTrailName').textContent = `"${t.name}" deleted`;
+  document.getElementById('undoToast').classList.add('visible');
+  undoTimer = setTimeout(() => finalizeDelete(), 8000);
+}
+
+function undoDelete() {
+  clearTimeout(undoTimer);
+  if (pendingDelete) {
+    const ts = getTombstones();
+    delete ts[pendingDelete.id];
+    saveTombstones(ts);
+    trails.push(pendingDelete.trail);
+    pendingDelete = null;
+    saveData(); renderList(); renderMap();
+  }
+  document.getElementById('undoToast').classList.remove('visible');
+}
+
+function finalizeDelete() {
+  pendingDelete = null;
+  document.getElementById('undoToast').classList.remove('visible');
+}
+
 function deleteTrail() {
-  if (!selectedId) return; if (!confirm('Delete this trail?')) return;
-  addTombstone(selectedId);
-  trails = trails.filter(t=>t.id!==selectedId);
-  saveData(); closeDetail(); renderList(); renderMap();
-  // On mobile, go back to trail list
+  if (!selectedId) return;
+  const id = selectedId;
+  closeDetail();
+  softDeleteTrail(id);
   if (window.innerWidth <= 800) switchMobileTab('list');
 }
 
 // ===== EXPORT / IMPORT =====
 function exportData() {
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(trails,null,2)], {type:'application/json'}));
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(trails.map(compressTrailForStorage),null,2)], {type:'application/json'}));
   a.download = `trail-journal-${new Date().toISOString().split('T')[0]}.json`;
   a.click();
 }
@@ -2111,7 +2252,13 @@ function importData(e) {
       if (Array.isArray(data)) {
         const ids = new Set(trails.map(t=>t.id));
         let added = 0;
-        data.forEach(t => { if (!ids.has(t.id)) { trails.push(t); added++; } });
+        data.forEach(t => {
+          if (!ids.has(t.id)) {
+            if (t.gpxTimes) t.gpxTimes = decompressGpxTimes(t.gpxTimes);
+            if (t.coords) t.coords = t.coords.map(c => [Math.round(c[0]*1e6)/1e6, Math.round(c[1]*1e6)/1e6]);
+            trails.push(t); added++;
+          }
+        });
         saveData(); renderList(); renderMap();
         alert(`Imported ${added} new trail(s). ${data.length-added} duplicates skipped.`);
       }
@@ -2125,16 +2272,13 @@ let activeSwipe = null;
 let swipeLock = false;
 
 function swipeDelete(id) {
-  // Animate the card out, then collapse the row, then remove from data
   const wrapper = document.querySelector(`.trail-card-wrapper[data-trail-id="${id}"]`);
   if (wrapper) {
     const inner = wrapper.querySelector('.trail-card-inner');
-    // Slide fully off screen
     if (inner) {
       inner.style.transition = 'transform 0.2s ease';
       inner.style.transform = 'translateX(-100%)';
     }
-    // Collapse height smoothly
     wrapper.style.transition = 'height 0.25s ease, opacity 0.2s ease';
     wrapper.style.height = wrapper.offsetHeight + 'px';
     wrapper.style.overflow = 'hidden';
@@ -2142,18 +2286,13 @@ function swipeDelete(id) {
       wrapper.style.height = '0px';
       wrapper.style.opacity = '0';
     });
-    // After animation, actually remove data
     setTimeout(() => {
-      addTombstone(id);
-      trails = trails.filter(t => t.id !== id);
       activeSwipe = null;
-      saveData(); renderList(); renderMap();
+      softDeleteTrail(id);
     }, 280);
   } else {
-    addTombstone(id);
-    trails = trails.filter(t => t.id !== id);
     activeSwipe = null;
-    saveData(); renderList(); renderMap();
+    softDeleteTrail(id);
   }
 }
 
