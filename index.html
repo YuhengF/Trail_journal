@@ -137,10 +137,37 @@ body {
 .trail-list::-webkit-scrollbar-track { background: transparent; }
 .trail-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
+.trail-card-wrapper {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius);
+  margin-bottom: 4px;
+}
+
+.trail-card-delete {
+  position: absolute;
+  right: 0; top: 0; bottom: 0;
+  width: 72px;
+  background: #d63031;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  border: none;
+  cursor: pointer;
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
 .trail-card {
+  position: relative;
   padding: 12px 14px; border-radius: var(--radius);
-  cursor: pointer; transition: all 0.15s;
-  border: 1px solid transparent; margin-bottom: 4px;
+  cursor: pointer; transition: transform 0.2s ease, background 0.15s;
+  border: 1px solid transparent;
+  background: var(--bg-panel);
+  z-index: 1;
 }
 
 .trail-card:hover { background: var(--bg-hover); }
@@ -1262,7 +1289,9 @@ function renderList() {
     ? `<div style="text-align:center;padding:40px 20px;color:var(--text-muted);font-size:13px;line-height:1.6;">${trails.length===0?'No trails yet.<br><br>Tap <strong style="color:var(--accent)">+ Add Trail</strong> to log your first hike,<br>or set up <strong>⚙ Sync</strong> to pull data from another device.':'No matches found.'}</div>`
     : filtered.map(t => {
       const color = getTrailColor(trails.indexOf(t));
-      return `<div class="trail-card ${selectedId===t.id?'selected':''}" onclick="openDetail('${t.id}')">
+      return `<div class="trail-card-wrapper" data-trail-id="${t.id}">
+        <button class="trail-card-delete" onclick="swipeDelete('${t.id}')">Delete</button>
+        <div class="trail-card ${selectedId===t.id?'selected':''}" onclick="openDetailGuarded('${t.id}')">
         <div class="trail-card-header">
           <span class="trail-name"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:6px;vertical-align:middle;"></span>${t.name}</span>
           <span class="trail-status ${t.status}">${t.status==='wishlist'?'★ Wishlist':'✓ Done'}</span>
@@ -1270,9 +1299,12 @@ function renderList() {
         <div class="trail-meta">${t.date?`<span>${t.date}</span>`:''}${t.distance?`<span>${t.distance} mi</span>`:''}${t.elevation?`<span>${t.elevation} ft ↑</span>`:''}${t.duration?`<span>${t.duration}</span>`:''}${t.difficulty?`<span>${t.difficulty}</span>`:''}</div>
         ${t.rating?`<div class="trail-rating">${'★'.repeat(t.rating)}${'☆'.repeat(5-t.rating)}</div>`:''}
         ${(t.tags&&t.tags.length)?`<div class="trail-tags">${t.tags.map(tg=>`<span class="trail-tag">${tg}</span>`).join('')}</div>`:''}
+      </div>
       </div>`;
     }).join('');
   updateStats();
+  // Attach swipe handlers after rendering
+  initSwipeHandlers();
 }
 
 function updateStats() {
@@ -1434,13 +1466,18 @@ function openDetail(id) {
 }
 
 function closeDetail() { document.getElementById('detailPanel').classList.remove('open'); selectedId=null; resetMapHighlight(); renderList(); }
-function editTrail() { if (selectedId) { closeDetail(); openEditModal(selectedId); } }
+function editTrail() {
+  const id = selectedId;
+  if (id) { closeDetail(); openEditModal(id); }
+}
 
 function deleteTrail() {
   if (!selectedId) return; if (!confirm('Delete this trail?')) return;
-  addTombstone(selectedId); // Record deletion so it syncs across devices
+  addTombstone(selectedId);
   trails = trails.filter(t=>t.id!==selectedId);
   saveData(); closeDetail(); renderList(); renderMap();
+  // On mobile, go back to trail list
+  if (window.innerWidth <= 800) switchMobileTab('list');
 }
 
 // ===== EXPORT / IMPORT =====
@@ -1468,6 +1505,86 @@ function importData(e) {
   };
   reader.readAsText(file); e.target.value='';
 }
+
+// ===== SWIPE TO DELETE =====
+let activeSwipe = null;
+let swipeLock = false; // prevents click from firing after swipe
+
+function swipeDelete(id) {
+  addTombstone(id);
+  trails = trails.filter(t => t.id !== id);
+  activeSwipe = null;
+  saveData(); renderList(); renderMap();
+}
+
+function openDetailGuarded(id) {
+  // Don't open detail if we just swiped
+  if (swipeLock) return;
+  // If a card is swiped open, close it instead
+  if (activeSwipe) {
+    activeSwipe.style.transform = 'translateX(0)';
+    activeSwipe = null;
+    return;
+  }
+  openDetail(id);
+}
+
+function initSwipeHandlers() {
+  document.querySelectorAll('.trail-card-wrapper').forEach(wrapper => {
+    const card = wrapper.querySelector('.trail-card');
+    let startX = 0, startY = 0, currentX = 0, swiping = false;
+
+    card.addEventListener('touchstart', (e) => {
+      if (activeSwipe && activeSwipe !== card) {
+        activeSwipe.style.transform = 'translateX(0)';
+        activeSwipe = null;
+      }
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      currentX = startX;
+      swiping = false;
+      swipeLock = false;
+      card.style.transition = 'none';
+    }, { passive: true });
+
+    card.addEventListener('touchmove', (e) => {
+      currentX = e.touches[0].clientX;
+      const dx = currentX - startX;
+      const dy = e.touches[0].clientY - startY;
+      // Only horizontal swipe left, ignore vertical scroll
+      if (Math.abs(dx) > Math.abs(dy) && dx < -8) {
+        swiping = true;
+        card.style.transform = `translateX(${Math.max(dx, -80)}px)`;
+      }
+    }, { passive: true });
+
+    card.addEventListener('touchend', () => {
+      card.style.transition = 'transform 0.2s ease';
+      const dx = currentX - startX;
+      if (swiping && dx < -35) {
+        card.style.transform = 'translateX(-72px)';
+        activeSwipe = card;
+        swipeLock = true;
+        setTimeout(() => { swipeLock = false; }, 300);
+      } else {
+        card.style.transform = 'translateX(0)';
+        if (activeSwipe === card) activeSwipe = null;
+        if (swiping) {
+          swipeLock = true;
+          setTimeout(() => { swipeLock = false; }, 300);
+        }
+      }
+    });
+  });
+}
+
+// Close swipe when tapping elsewhere
+document.addEventListener('touchstart', (e) => {
+  if (activeSwipe && !e.target.closest('.trail-card-wrapper')) {
+    activeSwipe.style.transform = 'translateX(0)';
+    activeSwipe = null;
+  }
+}, { passive: true });
 
 // ===== MOBILE TAB NAVIGATION =====
 function switchMobileTab(tab) {
