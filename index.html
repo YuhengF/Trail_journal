@@ -401,13 +401,21 @@ body {
 .trim-sliders { display: flex; flex-direction: column; gap: 18px; margin: 10px 0 4px; }
 .trim-slider-row { display: flex; align-items: center; gap: 10px; }
 .trim-slider-min, .trim-slider-max { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); min-width: 24px; }
-.trim-range { flex: 1; height: 8px; -webkit-appearance: none; appearance: none; background: var(--bg-input); border-radius: 4px; outline: none; }
-.trim-range::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--bg-panel); box-shadow: var(--shadow); }
-.trim-range::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--bg-panel); }
+.trim-range { flex: 1; height: 8px; -webkit-appearance: none; appearance: none; background: var(--border-light); border-radius: 4px; outline: none; border: 1px solid var(--border); }
+.trim-range::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); cursor: grab; border: 3px solid var(--bg-panel); box-shadow: 0 2px 8px rgba(199,98,58,0.35); transition: box-shadow 0.15s, transform 0.1s; }
+.trim-range::-webkit-slider-thumb:active { cursor: grabbing; transform: scale(1.15); box-shadow: 0 3px 12px rgba(199,98,58,0.5); }
+.trim-range::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); cursor: grab; border: 3px solid var(--bg-panel); box-shadow: 0 2px 8px rgba(199,98,58,0.35); }
+.trim-range::-moz-range-thumb:active { cursor: grabbing; }
+.trim-range:focus { border-color: var(--accent); }
 .trim-slider-labels { display: flex; flex-direction: column; gap: 2px; font-size: 10px; color: var(--text-muted); margin-top: 4px; }
-.trim-preview { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--text); margin-top: 12px; }
-.trim-preview strong { color: var(--accent); }
+.trim-preview { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--text); margin-top: 12px; transition: all 0.15s ease; }
+.trim-preview strong { color: var(--accent); font-family: 'JetBrains Mono', monospace; }
 .trim-elev-note { font-size: 11px; color: var(--text-muted); margin-top: 10px; line-height: 1.4; }
+.trim-legend { display: flex; gap: 14px; margin-top: 10px; font-size: 11px; color: var(--text-dim); align-items: center; }
+.trim-legend-item { display: flex; align-items: center; gap: 5px; }
+.trim-legend-swatch { width: 20px; height: 3px; border-radius: 2px; }
+.trim-legend-dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--border); }
+#trimStartLabel, #trimEndLabel { font-family: 'JetBrains Mono', monospace; font-weight: 500; color: var(--accent); }
 
 /* MAP POPUP */
 .trail-popup { font-family: 'DM Sans', sans-serif; }
@@ -842,6 +850,12 @@ img.leaflet-tile { image-rendering: auto; }
       </div>
       <div class="trim-preview" id="trimPreview">
         Keeping <strong id="trimKeepCount">0</strong> points → New distance: <strong id="trimNewDist">0</strong> mi
+      </div>
+      <div class="trim-legend">
+        <div class="trim-legend-item"><span class="trim-legend-swatch" style="background:#aaa;border:none;height:2px;background:repeating-linear-gradient(90deg,#aaa 0,#aaa 4px,transparent 4px,transparent 8px);"></span> Trimmed away</div>
+        <div class="trim-legend-item"><span class="trim-legend-swatch" style="background:var(--accent);height:4px;"></span> Keeping</div>
+        <div class="trim-legend-item"><span class="trim-legend-dot" style="background:#2eaa55;"></span> Start</div>
+        <div class="trim-legend-item"><span class="trim-legend-dot" style="background:#e8552e;"></span> End</div>
       </div>
       <p class="trim-elev-note" id="trimElevNote">Distance is recalculated automatically. Adjust elevation in Edit if needed.</p>
     </div>
@@ -1358,6 +1372,81 @@ function distanceFromCoords(coords) {
 
 // ===== TRIM TRACK =====
 let trimTrailId = null;
+let trimPreviewLayers = { startFade: null, startOutline: null, keepLine: null, keepOutline: null, endFade: null, endOutline: null, startDot: null, endDot: null };
+
+function clearTrimPreview() {
+  Object.keys(trimPreviewLayers).forEach(k => {
+    if (trimPreviewLayers[k]) { map.removeLayer(trimPreviewLayers[k]); trimPreviewLayers[k] = null; }
+  });
+}
+
+function showTrimPreview() {
+  const t = trails.find(x => x.id === trimTrailId);
+  if (!t || !t.coords) return;
+  const start = parseInt(document.getElementById('trimStart').value, 10);
+  const end = parseInt(document.getElementById('trimEnd').value, 10);
+  const allCoords = t.coords;
+  const color = getTrailColor(trails.indexOf(t));
+
+  const headCoords = allCoords.slice(0, start);
+  const keepCoords = allCoords.slice(start - 1, end);
+  const tailCoords = allCoords.slice(end - 1);
+
+  clearTrimPreview();
+
+  // Hide the original trail layers
+  const orig = trailLayers[t.id];
+  if (orig) {
+    orig.line.setStyle({ opacity: 0 });
+    orig.outline.setStyle({ opacity: 0 });
+  }
+
+  // Trimmed-away head (dashed, faded)
+  if (headCoords.length >= 2) {
+    trimPreviewLayers.startOutline = L.polyline(headCoords, { color: '#888', weight: 6, opacity: 0.15, smoothFactor: 1, interactive: false, dashArray: '6,8' }).addTo(map);
+    trimPreviewLayers.startFade = L.polyline(headCoords, { color: '#888', weight: 3, opacity: 0.3, smoothFactor: 1, interactive: false, dashArray: '6,8' }).addTo(map);
+  }
+
+  // Trimmed-away tail (dashed, faded)
+  if (tailCoords.length >= 2) {
+    trimPreviewLayers.endOutline = L.polyline(tailCoords, { color: '#888', weight: 6, opacity: 0.15, smoothFactor: 1, interactive: false, dashArray: '6,8' }).addTo(map);
+    trimPreviewLayers.endFade = L.polyline(tailCoords, { color: '#888', weight: 3, opacity: 0.3, smoothFactor: 1, interactive: false, dashArray: '6,8' }).addTo(map);
+  }
+
+  // Kept segment (solid, bold)
+  if (keepCoords.length >= 2) {
+    trimPreviewLayers.keepOutline = L.polyline(keepCoords, { color: '#1a1a1e', weight: 9, opacity: 0.5, smoothFactor: 1, interactive: false }).addTo(map);
+    trimPreviewLayers.keepLine = L.polyline(keepCoords, { color, weight: 5.5, opacity: 1, smoothFactor: 1, interactive: false }).addTo(map);
+  }
+
+  // Start marker dot (green)
+  if (keepCoords.length >= 1) {
+    trimPreviewLayers.startDot = L.circleMarker(keepCoords[0], {
+      radius: 7, fillColor: '#2eaa55', fillOpacity: 1,
+      color: '#fff', weight: 2.5, interactive: false
+    }).addTo(map);
+  }
+
+  // End marker dot (red-orange)
+  if (keepCoords.length >= 1) {
+    trimPreviewLayers.endDot = L.circleMarker(keepCoords[keepCoords.length - 1], {
+      radius: 7, fillColor: '#e8552e', fillOpacity: 1,
+      color: '#fff', weight: 2.5, interactive: false
+    }).addTo(map);
+  }
+}
+
+function restoreOriginalTrail() {
+  clearTrimPreview();
+  const t = trails.find(x => x.id === trimTrailId);
+  if (t) {
+    const orig = trailLayers[t.id];
+    if (orig) {
+      orig.line.setStyle({ opacity: 1 });
+      orig.outline.setStyle({ opacity: 0.5 });
+    }
+  }
+}
 
 function openTrimModal() {
   const t = trails.find(x => x.id === selectedId);
@@ -1376,6 +1465,14 @@ function openTrimModal() {
   document.getElementById('trimStartMax').textContent = N - 1;
   document.getElementById('trimEndMax').textContent = N;
   updateTrimUI();
+  showTrimPreview();
+  // Dim all other trails so the preview stands out
+  Object.entries(trailLayers).forEach(([tid, l]) => {
+    if (tid !== t.id) {
+      l.line.setStyle({ opacity: 0.08 });
+      l.outline.setStyle({ opacity: 0.03 });
+    }
+  });
   document.getElementById('trimModalOverlay').classList.add('open');
 }
 
@@ -1392,6 +1489,7 @@ function onTrimSliderChange() {
     else trimStartEl.value = Math.max(1, end - 1);
   }
   updateTrimUI();
+  showTrimPreview();
 }
 
 function updateTrimUI() {
@@ -1422,8 +1520,15 @@ function updateTrimUI() {
 
 function closeTrimModal(e) {
   if (e && e.target !== e.currentTarget) return;
+  restoreOriginalTrail();
+  // Restore other trails' opacity
+  Object.values(trailLayers).forEach(l => {
+    l.line.setStyle({ opacity: 1, weight: 5 });
+    l.outline.setStyle({ opacity: 0.5 });
+  });
   document.getElementById('trimModalOverlay').classList.remove('open');
   trimTrailId = null;
+  if (selectedId) focusTrail(selectedId);
 }
 
 function applyTrim() {
@@ -1436,11 +1541,13 @@ function applyTrim() {
   t.coords = trimmed;
   t.distance = distanceFromCoords(trimmed);
   t.updatedAt = Date.now();
+  clearTrimPreview();
+  document.getElementById('trimModalOverlay').classList.remove('open');
+  trimTrailId = null;
   saveData();
-  closeTrimModal();
-  openDetail(t.id);
   renderList();
   renderMap();
+  openDetail(t.id);
 }
 
 // ===== TRAIL LIST =====
