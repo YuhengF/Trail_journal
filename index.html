@@ -1533,18 +1533,17 @@ function onMapTrailClick(trailId) {
 function toggleTrailVisibility() {
   trailsVisible = !trailsVisible;
   document.getElementById('trailToggle').classList.toggle('active', trailsVisible);
-  Object.values(trailLayers).forEach(l => {
-    if (trailsVisible) {
-      l.lines.forEach(x => x.addTo(map));
-      l.outline.addTo(map);
-      l.hitArea.addTo(map);
-    } else {
+  if (trailsVisible) {
+    Object.values(trailLayers).forEach(l => { l.hitArea.addTo(map); l.outline.addTo(map); });
+    Object.values(trailLayers).forEach(l => { l.lines.forEach(x => x.addTo(map)); });
+  } else {
+    map.closePopup();
+    Object.values(trailLayers).forEach(l => {
       l.lines.forEach(x => map.removeLayer(x));
       map.removeLayer(l.outline);
       map.removeLayer(l.hitArea);
-      map.closePopup();
-    }
-  });
+    });
+  }
 }
 
 // ===== GPX PARSER =====
@@ -1869,7 +1868,7 @@ function openAddModal() {
   document.getElementById('modalOverlay').classList.add('open');
   document.getElementById('gpxDrop').innerHTML = `<div>📂 Drop a GPX file here or click to import</div><div style="font-size:10px;margin-top:4px;color:var(--text-muted)">Auto-fills track, distance & elevation</div><input type="file" id="gpxFile" accept=".gpx">`;
   bindGpxInput();
-  if (window.innerWidth <= 800) document.getElementById('sidebar').classList.add('hidden');
+  if (window.innerWidth <= 800) document.getElementById('sidebar').classList.remove('mobile-visible');
 }
 
 function openEditModal(id) {
