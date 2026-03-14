@@ -538,36 +538,39 @@ img.leaflet-tile { image-rendering: auto; }
   .detail-panel { bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
 
   /* Larger tap targets everywhere */
-  .chip { font-size: 13px; padding: 8px 14px; }
-  .btn { padding: 14px; font-size: 14px; }
-  .sidebar-actions { padding: 12px 16px; }
-  .sidebar-actions .btn { padding: 16px; font-size: 15px; border-radius: 12px; }
-  .data-bar { padding: 10px 16px; }
-  .data-bar .btn { font-size: 13px; padding: 10px 12px; }
+  .chip { font-size: 12px; padding: 6px 11px; }
+  .btn { padding: 10px; font-size: 13px; }
 
-  /* Bigger search box */
-  .search-box { border-radius: 12px; }
-  .search-box input { font-size: 16px; padding: 12px 10px; }
+  /* COMPACT BOTTOM — hide sidebar add (it's in tab bar), merge sync into data bar */
+  .sidebar-actions { display: none; }
+  .data-bar { padding: 6px 12px; }
+  .data-bar .btn { font-size: 11px; padding: 7px 6px; }
+  .sync-bar { padding: 3px 12px; font-size: 10px; border-top: none; }
 
-  /* Trail cards easier to tap */
-  .trail-card { padding: 14px 16px; margin-bottom: 6px; }
-  .trail-name { font-size: 15px; }
-  .trail-meta { font-size: 12px; gap: 10px; }
-  .trail-status { font-size: 10px; padding: 4px 10px; }
-  .trail-tag { font-size: 11px; padding: 3px 9px; }
-  .trail-rating { font-size: 13px; }
+  /* COMPACT HEADER */
+  .sidebar-header { padding: 8px 14px 6px; }
+  .sidebar-header h1 { font-size: 17px; }
+  .sidebar-header .subtitle { display: none; }
+  .stats-row { margin-top: 4px; gap: 10px; }
+  .stat-val { font-size: 14px; }
+  .stat-label { font-size: 8px; margin-top: 0; }
 
-  /* Sidebar header */
-  .sidebar-header { padding: 20px 16px 16px; }
-  .sidebar-header h1 { font-size: 24px; }
+  /* COMPACT CONTROLS */
+  .controls { padding: 6px 14px; gap: 5px; border-bottom-width: 1px; }
+  .search-box { border-radius: 8px; }
+  .search-box input { font-size: 15px; padding: 7px 8px; }
+  .filter-chips { gap: 4px; }
+
+  /* COMPACT TRAIL CARDS */
+  .trail-card { padding: 9px 12px; margin-bottom: 1px; }
+  .trail-name { font-size: 14px; }
+  .trail-meta { font-size: 11px; gap: 8px; }
+  .trail-status { font-size: 9px; padding: 2px 7px; }
+  .trail-tag { font-size: 10px; padding: 1px 6px; }
+  .trail-rating { font-size: 11px; margin-top: 2px; }
+  .trail-tags { margin-top: 3px; gap: 3px; }
+
   .mobile-close-sidebar { display: none !important; }
-
-  /* Controls */
-  .controls { padding: 12px 16px; }
-  .filter-chips { gap: 8px; }
-
-  /* Sync bar */
-  .sync-bar { padding: 8px 16px; font-size: 12px; }
 
   /* Map controls bigger */
   .map-controls { padding: 5px; border-radius: 12px; }
@@ -815,10 +818,11 @@ img.leaflet-tile { image-rendering: auto; }
 <script>
 const STORAGE_KEY = 'trail_journal_data';
 const SYNC_CONFIG_KEY = 'trail_journal_sync';
+const TOMBSTONE_KEY = 'trail_journal_tombstones';
 let trails = [];
 let editingId = null, selectedId = null, currentRating = 0, gpxTrackData = null;
 let syncPending = false;
-let ghSha = null; // GitHub file SHA needed for updates
+let ghSha = null;
 
 const TRAIL_COLORS = [
   '#e8552e','#2eaa55','#2e88dd','#b044dd','#dd9922',
@@ -830,6 +834,29 @@ function loadTrails() { try { trails = JSON.parse(localStorage.getItem(STORAGE_K
 function saveLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(trails)); }
 function genId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
 function getTrailColor(i) { return TRAIL_COLORS[i % TRAIL_COLORS.length]; }
+
+// ===== TOMBSTONES — track deletions so they propagate across devices =====
+function getTombstones() {
+  try { return JSON.parse(localStorage.getItem(TOMBSTONE_KEY)) || {}; } catch { return {}; }
+}
+function saveTombstones(ts) { localStorage.setItem(TOMBSTONE_KEY, JSON.stringify(ts)); }
+
+function addTombstone(trailId) {
+  const ts = getTombstones();
+  ts[trailId] = Date.now();
+  saveTombstones(ts);
+}
+
+// Clean tombstones older than 30 days (they've propagated by now)
+function cleanOldTombstones() {
+  const ts = getTombstones();
+  const cutoff = Date.now() - (30 * 24 * 60 * 60 * 1000);
+  let changed = false;
+  for (const id in ts) {
+    if (ts[id] < cutoff) { delete ts[id]; changed = true; }
+  }
+  if (changed) saveTombstones(ts);
+}
 
 // ===== SYNC CONFIG =====
 function getSyncConfig() {
@@ -961,6 +988,7 @@ async function syncFromGitHub() {
   if (!cfg) { updateSyncStatus('offline', 'Local only'); return; }
 
   updateSyncStatus('pending', 'Pulling from GitHub...');
+  cleanOldTombstones();
 
   try {
     const res = await fetch(`https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${cfg.path}`, {
@@ -970,24 +998,58 @@ async function syncFromGitHub() {
     if (res.status === 200) {
       const data = await res.json();
       ghSha = data.sha;
-      const remote = JSON.parse(atob(data.content));
+      const raw = JSON.parse(atob(data.content));
 
-      // Merge: remote wins for existing IDs, keep local-only additions
-      const remoteIds = new Set(remote.map(t => t.id));
-      const localOnly = trails.filter(t => !remoteIds.has(t.id));
-      trails = [...remote, ...localOnly];
+      // Support both old format (plain array) and new format ({ trails, tombstones })
+      const remoteTrails = Array.isArray(raw) ? raw : (raw.trails || []);
+      const remoteTombstones = Array.isArray(raw) ? {} : (raw.tombstones || {});
+
+      // Merge tombstones: union of local and remote
+      const localTombstones = getTombstones();
+      const mergedTombstones = { ...remoteTombstones };
+      for (const id in localTombstones) {
+        if (!mergedTombstones[id] || localTombstones[id] > mergedTombstones[id]) {
+          mergedTombstones[id] = localTombstones[id];
+        }
+      }
+      saveTombstones(mergedTombstones);
+
+      // Merge trails: combine both sets, then remove anything with a tombstone
+      const localById = {};
+      trails.forEach(t => { localById[t.id] = t; });
+      const remoteById = {};
+      remoteTrails.forEach(t => { remoteById[t.id] = t; });
+
+      // Union of all trail IDs from both sides
+      const allIds = new Set([...Object.keys(localById), ...Object.keys(remoteById)]);
+      const merged = [];
+      for (const id of allIds) {
+        // Skip if tombstoned (deleted on any device)
+        if (mergedTombstones[id]) continue;
+        // Prefer the version with the later updatedAt, fallback to remote
+        const local = localById[id];
+        const remote = remoteById[id];
+        if (local && remote) {
+          merged.push((local.updatedAt || 0) >= (remote.updatedAt || 0) ? local : remote);
+        } else {
+          merged.push(local || remote);
+        }
+      }
+
+      trails = merged;
       saveLocal();
       renderList();
       renderMap();
       updateSyncStatus('synced', 'Synced just now');
       hideTokenBanner();
 
-      // If we had local-only items, push them back
-      if (localOnly.length > 0) syncToGitHub();
+      // Push merged state back if anything changed
+      const needsPush = JSON.stringify({ trails: merged, tombstones: mergedTombstones }) !==
+                        JSON.stringify({ trails: remoteTrails, tombstones: remoteTombstones });
+      if (needsPush) syncToGitHub();
     } else if (res.status === 401 || res.status === 403) {
       handleAuthError();
     } else if (res.status === 404) {
-      // File doesn't exist — push local data up
       ghSha = null;
       updateSyncStatus('synced', 'Connected (no remote data yet)');
       if (trails.length > 0) syncToGitHub();
@@ -1006,7 +1068,9 @@ async function syncToGitHub() {
   updateSyncStatus('pending', 'Pushing to GitHub...');
 
   try {
-    const content = btoa(unescape(encodeURIComponent(JSON.stringify(trails, null, 2))));
+    // New format: { trails, tombstones }
+    const payload = { trails, tombstones: getTombstones() };
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(payload, null, 2))));
     const body = {
       message: `Update trails — ${new Date().toISOString().split('T')[0]}`,
       content: content
@@ -1298,7 +1362,8 @@ function saveTrail() {
     companions: document.getElementById('fCompanions').value.trim(),
     notes: document.getElementById('fNotes').value.trim(),
     photos: document.getElementById('fPhotos').value.trim().split('\n').filter(Boolean),
-    coords
+    coords,
+    updatedAt: Date.now()
   };
   if (editingId) { const idx = trails.findIndex(t=>t.id===editingId); if (idx>=0) trails[idx]=trail; }
   else trails.push(trail);
@@ -1373,6 +1438,7 @@ function editTrail() { if (selectedId) { closeDetail(); openEditModal(selectedId
 
 function deleteTrail() {
   if (!selectedId) return; if (!confirm('Delete this trail?')) return;
+  addTombstone(selectedId); // Record deletion so it syncs across devices
   trails = trails.filter(t=>t.id!==selectedId);
   saveData(); closeDetail(); renderList(); renderMap();
 }
