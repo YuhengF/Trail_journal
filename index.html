@@ -339,6 +339,7 @@ body {
 
 .detail-actions button:hover { color: var(--text); border-color: var(--text-muted); }
 .detail-actions button.delete:hover { color: #c0392b; border-color: #c0392b; }
+.detail-actions button.trim-track { align-items: center; justify-content: center; }
 .detail-actions button.trim-track:hover { color: var(--accent); border-color: var(--accent); }
 
 .detail-body { padding: 20px; }
@@ -1626,9 +1627,13 @@ function openDetail(id) {
   if (t.tags&&t.tags.length) h+=`<div class="detail-section"><h3>Tags</h3><div class="detail-tags">${t.tags.map(tg=>`<span class="trail-tag">${tg}</span>`).join('')}</div></div>`;
   if (t.notes) h+=`<div class="detail-section"><h3>Journal</h3><p>${t.notes.replace(/\n/g,'<br>')}</p></div>`;
   if (t.photos&&t.photos.length) h+=`<div class="detail-section"><h3>Photos</h3><div class="detail-photos">${t.photos.map(u=>`<img src="${u}" onerror="this.style.display='none'" loading="lazy">`).join('')}</div></div>`;
+  const hasTrack = t.coords && Array.isArray(t.coords) && t.coords.length > 2;
+  if (hasTrack) {
+    h += `<div class="detail-section"><h3>Track</h3><p style="margin-bottom:8px;">${t.coords.length} GPS points recorded</p><button class="btn" onclick="openTrimModal()" style="padding:8px 16px;font-size:12px;">✂ Trim track</button></div>`;
+  }
   document.getElementById('detailBody').innerHTML = h;
   const trimBtn = document.getElementById('detailTrimBtn');
-  if (trimBtn) trimBtn.style.display = (t.coords && t.coords.length > 2) ? '' : 'none';
+  if (trimBtn) trimBtn.style.display = hasTrack ? 'flex' : 'none';
   document.getElementById('detailPanel').classList.add('open');
   // On mobile, switch to map tab so user sees the trail
   if (window.innerWidth <= 800) switchMobileTab('map');
