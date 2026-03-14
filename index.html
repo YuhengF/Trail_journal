@@ -772,6 +772,7 @@ img.leaflet-tile { image-rendering: auto; }
         <div class="stat"><span class="stat-val" id="statTrails">0</span><span class="stat-label">Trails</span></div>
         <div class="stat"><span class="stat-val" id="statDistance">0</span><span class="stat-label">Total mi</span></div>
         <div class="stat"><span class="stat-val" id="statElevation">0</span><span class="stat-label">Total ft ↑</span></div>
+        <div class="stat"><span class="stat-val" id="statDuration">0h</span><span class="stat-label">Total Time</span></div>
         <div class="stat"><span class="stat-val" id="statWishlist">0</span><span class="stat-label">Wishlist</span></div>
       </div>
     </div>
@@ -926,7 +927,7 @@ img.leaflet-tile { image-rendering: auto; }
       </div>
     </div>
     <div class="trim-preview" id="trimPreview">
-      Keeping <strong id="trimKeepCount">0</strong> of <strong id="trimTotalPts">0</strong> pts → <strong id="trimNewDist">0</strong> mi
+      Keeping <strong id="trimKeepCount">0</strong> of <strong id="trimTotalPts">0</strong> pts → <strong id="trimNewDist">0</strong> mi<span id="trimNewDuration"></span>
     </div>
     <div class="trim-legend">
       <div class="trim-legend-item"><span class="trim-legend-swatch" style="height:2px;background:repeating-linear-gradient(90deg,#999 0,#999 4px,transparent 4px,transparent 8px);"></span> Removed</div>
@@ -996,7 +997,7 @@ const STORAGE_KEY = 'trail_journal_data';
 const SYNC_CONFIG_KEY = 'trail_journal_sync';
 const TOMBSTONE_KEY = 'trail_journal_tombstones';
 let trails = [];
-let editingId = null, selectedId = null, currentRating = 0, gpxTrackData = null, gpxSpeedData = null;
+let editingId = null, selectedId = null, currentRating = 0, gpxTrackData = null, gpxSpeedData = null, gpxTimesData = null;
 let trailsVisible = true, focusedTrailId = null, savedMapView = null;
 let syncPending = false;
 let ghSha = null;
@@ -1609,7 +1610,14 @@ function parseGPX(xmlStr) {
       if (speeds.some(s => s !== null)) speedData = { chunkSize: CHUNK, speeds };
     }
   }
-  return { coords, distance: (dist*0.621371).toFixed(1), elevation: Math.round(gain*3.28084), name: nameEl ? nameEl.textContent : '', speedData };
+  let duration = null, startDate = null;
+  const validTimestamps = times.filter(t => t !== null && !isNaN(t));
+  if (validTimestamps.length >= 2) {
+    startDate = new Date(validTimestamps[0]);
+    const durationMs = validTimestamps[validTimestamps.length - 1] - validTimestamps[0];
+    if (durationMs > 0) duration = formatDuration(durationMs);
+  }
+  return { coords, distance: (dist*0.621371).toFixed(1), elevation: Math.round(gain*3.28084), name: nameEl ? nameEl.textContent : '', speedData, times, duration, startDate };
 }
 
 function haversine([lat1,lon1],[lat2,lon2]) {
@@ -1623,6 +1631,35 @@ function distanceFromCoords(coords) {
   let dist = 0;
   for (let i = 1; i < coords.length; i++) dist += haversine(coords[i - 1], coords[i]);
   return (dist * 0.621371).toFixed(1);
+}
+
+function formatDuration(ms) {
+  const totalMin = Math.round(ms / 60000);
+  if (totalMin < 1) return '< 1m';
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h > 0 && m > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}h`;
+  return `${m}m`;
+}
+
+function parseDurationToMinutes(str) {
+  if (!str) return 0;
+  let mins = 0;
+  const hMatch = str.match(/(\d+)\s*h/i);
+  const mMatch = str.match(/(\d+)\s*m/i);
+  if (hMatch) mins += parseInt(hMatch[1]) * 60;
+  if (mMatch) mins += parseInt(mMatch[1]);
+  return mins;
+}
+
+function durationFromTimes(timesArr, startIdx, endIdx) {
+  if (!timesArr || timesArr.length === 0) return null;
+  const slice = timesArr.slice(startIdx, endIdx);
+  const valid = slice.filter(t => t !== null && !isNaN(t));
+  if (valid.length < 2) return null;
+  const ms = valid[valid.length - 1] - valid[0];
+  return ms > 0 ? formatDuration(ms) : null;
 }
 
 // ===== TRIM TRACK =====
@@ -1771,6 +1808,11 @@ function updateTrimUI() {
   document.getElementById('trimEndLabel').textContent = end;
   document.getElementById('trimKeepCount').textContent = keepCount;
   document.getElementById('trimNewDist').textContent = newDist;
+  const trimDurEl = document.getElementById('trimNewDuration');
+  if (trimDurEl) {
+    const trimDur = durationFromTimes(t.gpxTimes, start - 1, end);
+    trimDurEl.textContent = trimDur ? `, ${trimDur}` : '';
+  }
   document.getElementById('trimApplyBtn').disabled = keepCount < 2;
 }
 
@@ -1796,6 +1838,11 @@ function applyTrim() {
   t.coords = trimmed;
   t.speedData = null;
   t.distance = distanceFromCoords(trimmed);
+  if (t.gpxTimes) {
+    t.gpxTimes = t.gpxTimes.slice(start - 1, end);
+    const newDuration = durationFromTimes(t.gpxTimes, 0, t.gpxTimes.length);
+    if (newDuration) t.duration = newDuration;
+  }
   t.updatedAt = Date.now();
   clearTrimPreview();
   document.getElementById('trimPanel').classList.remove('open');
@@ -1840,6 +1887,9 @@ function updateStats() {
   document.getElementById('statTrails').textContent = c.length;
   document.getElementById('statDistance').textContent = c.reduce((s,t) => s+(parseFloat(t.distance)||0), 0).toFixed(1);
   document.getElementById('statElevation').textContent = Math.round(c.reduce((s,t) => s+(parseInt(t.elevation)||0), 0)).toLocaleString();
+  const totalMin = c.reduce((s,t) => s + parseDurationToMinutes(t.duration), 0);
+  const dh = Math.floor(totalMin / 60), dm = totalMin % 60;
+  document.getElementById('statDuration').textContent = totalMin > 0 ? (dh > 0 ? (dm > 0 ? `${dh}h ${dm}m` : `${dh}h`) : `${dm}m`) : '0h';
   document.getElementById('statWishlist').textContent = trails.filter(t => t.status==='wishlist').length;
 }
 
@@ -1861,7 +1911,7 @@ document.querySelectorAll('.map-controls button[data-layer]').forEach(btn => {
 
 // ===== MODAL =====
 function openAddModal() {
-  editingId = null; gpxTrackData = null; gpxSpeedData = null;
+  editingId = null; gpxTrackData = null; gpxSpeedData = null; gpxTimesData = null;
   document.getElementById('modalTitle').textContent = 'Add Trail';
   document.getElementById('saveBtn').textContent = 'Save Trail';
   clearForm();
@@ -1874,7 +1924,7 @@ function openAddModal() {
 
 function openEditModal(id) {
   const t = trails.find(x => x.id===id); if (!t) return;
-  editingId = id; gpxTrackData = t.coords || null; gpxSpeedData = t.speedData || null;
+  editingId = id; gpxTrackData = t.coords || null; gpxSpeedData = t.speedData || null; gpxTimesData = t.gpxTimes || null;
   document.getElementById('modalTitle').textContent = 'Edit Trail';
   document.getElementById('saveBtn').textContent = 'Update Trail';
   document.getElementById('fName').value = t.name||'';
@@ -1932,6 +1982,7 @@ function saveTrail() {
     photos: document.getElementById('fPhotos').value.trim().split('\n').filter(Boolean),
     coords,
     speedData: gpxSpeedData || (editingId ? (trails.find(x => x.id === editingId)?.speedData || null) : null),
+    gpxTimes: gpxTimesData || (editingId ? (trails.find(x => x.id === editingId)?.gpxTimes || null) : null),
     updatedAt: Date.now()
   };
   if (editingId) { const idx = trails.findIndex(t=>t.id===editingId); if (idx>=0) trails[idx]=trail; }
@@ -1961,17 +2012,30 @@ function bindGpxInput() {
 }
 
 function handleGPXFile(file) {
+  const fileDate = new Date(file.lastModified);
   const reader = new FileReader();
   reader.onload = e => {
     try {
       const r = parseGPX(e.target.result);
       gpxTrackData = r.coords;
       gpxSpeedData = r.speedData || null;
-      if (r.name && !document.getElementById('fName').value) document.getElementById('fName').value = r.name;
+      gpxTimesData = r.times || null;
+      const trailDate = r.startDate || (fileDate && !isNaN(fileDate.getTime()) ? fileDate : null);
+      if (trailDate) {
+        document.getElementById('fDate').value = trailDate.toISOString().split('T')[0];
+      }
+      if (!document.getElementById('fName').value) {
+        if (r.name) {
+          document.getElementById('fName').value = r.name;
+        } else if (trailDate) {
+          document.getElementById('fName').value = trailDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+      }
       if (r.distance) document.getElementById('fDistance').value = r.distance;
       if (r.elevation) document.getElementById('fElevation').value = r.elevation;
-      const speedNote = gpxSpeedData ? ', speed data captured' : '';
-      document.getElementById('gpxDrop').innerHTML = `<div style="color:var(--green)">✓ GPX loaded — ${r.coords.length} points, ${r.distance} mi, ${r.elevation} ft gain${speedNote}</div>`;
+      if (r.duration) document.getElementById('fDuration').value = r.duration;
+      const extras = [r.duration, gpxSpeedData ? 'speed data' : ''].filter(Boolean).join(', ');
+      document.getElementById('gpxDrop').innerHTML = `<div style="color:var(--green)">✓ GPX loaded — ${r.coords.length} points, ${r.distance} mi, ${r.elevation} ft gain${extras ? ', ' + extras : ''}</div>`;
     } catch(err) { document.getElementById('gpxDrop').innerHTML = `<div style="color:#c0392b">Error: ${err.message}</div>`; }
   };
   reader.readAsText(file);
