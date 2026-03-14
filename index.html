@@ -1867,7 +1867,7 @@ function openDetail(id) {
   if (trimBtn) trimBtn.style.display = hasTrack ? 'flex' : 'none';
   document.getElementById('detailPanel').classList.add('open');
   // On mobile, switch to map tab so user sees the trail
-  if (window.innerWidth <= 800) switchMobileTab('map');
+  if (window.innerWidth <= 800) switchMobileTab('map', false);
   if (t.coords&&t.coords.length) focusTrail(id);
 }
 
@@ -2016,28 +2016,24 @@ document.addEventListener('touchstart', (e) => {
 }, { passive: true });
 
 // ===== MOBILE TAB NAVIGATION =====
-function switchMobileTab(tab) {
+function switchMobileTab(tab, resetView = true) {
   const sidebar = document.getElementById('sidebar');
   const tabs = document.querySelectorAll('.mobile-tab');
 
   tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
 
-  if (tab === 'list') {
-    // Close detail panel and trim panel so user returns to the trail list view
-    document.getElementById('detailPanel').classList.remove('open');
-    document.getElementById('trimPanel').classList.remove('open');
-    if (trimTrailId) { restoreOriginalTrail(); trimTrailId = null; }
-    selectedId = null;
-    resetMapHighlight();
-    sidebar.classList.add('mobile-visible');
-  } else {
-    // Close detail panel and trim panel so user returns to a clean map view
+  if (resetView) {
     document.getElementById('detailPanel').classList.remove('open');
     document.getElementById('trimPanel').classList.remove('open');
     if (trimTrailId) { restoreOriginalTrail(); trimTrailId = null; }
     selectedId = null;
     resetMapHighlight();
     renderList();
+  }
+
+  if (tab === 'list') {
+    sidebar.classList.add('mobile-visible');
+  } else {
     sidebar.classList.remove('mobile-visible');
     setTimeout(() => map.invalidateSize(), 300);
   }
