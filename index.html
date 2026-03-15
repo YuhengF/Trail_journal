@@ -498,6 +498,75 @@ body {
 }
 .trim-panel-actions .btn { flex: 1; padding: 9px; font-size: 12px; }
 
+/* DRAW ON MAP MODE */
+.draw-panel {
+  position: fixed;
+  bottom: 20px; left: 50%; transform: translateX(-50%) translateY(calc(100% + 40px));
+  z-index: 2500;
+  width: 380px; max-width: calc(100vw - 24px);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08);
+  opacity: 0; pointer-events: none;
+  transition: transform 0.35s cubic-bezier(0.34, 1.4, 0.64, 1), opacity 0.25s ease;
+}
+.draw-panel.open {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1; pointer-events: auto;
+}
+.draw-panel-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 18px 0;
+}
+.draw-panel-header h2 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 16px; font-weight: 400;
+}
+.draw-panel-body { padding: 10px 18px 16px; }
+.draw-info {
+  font-size: 11.5px; color: var(--text-muted); line-height: 1.45; margin-bottom: 10px;
+}
+.draw-stats {
+  display: flex; gap: 16px; margin-bottom: 12px;
+}
+.draw-stat-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 15px; font-weight: 600; color: var(--accent);
+}
+.draw-stat-label {
+  font-size: 9px; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.8px; margin-top: 1px;
+}
+.draw-panel-actions {
+  display: flex; gap: 8px;
+}
+.draw-panel-actions .btn { flex: 1; padding: 9px; font-size: 12px; }
+.draw-panel-actions .btn:disabled { opacity: 0.4; cursor: default; }
+
+.draw-mode-active #map { cursor: crosshair !important; }
+.draw-mode-active .leaflet-container { cursor: crosshair !important; }
+
+.draw-coord-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; padding: 5px 10px; border-radius: 7px;
+  border: 1px solid var(--border); background: var(--bg-input);
+  color: var(--accent); cursor: pointer; font-family: inherit;
+  font-weight: 500; transition: all 0.15s; margin-top: 6px;
+}
+.draw-coord-btn:hover { background: var(--accent-soft); border-color: var(--accent); }
+
+@media (max-width: 800px) {
+  .draw-panel {
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+    width: calc(100vw - 16px);
+    border-radius: 14px;
+  }
+  .draw-panel-header { padding: 12px 14px 0; }
+  .draw-panel-body { padding: 8px 14px 14px; }
+  .draw-panel-actions .btn { padding: 12px; font-size: 14px; }
+}
+
 @media (max-width: 800px) {
   .trim-panel {
     bottom: calc(64px + env(safe-area-inset-bottom, 0px));
@@ -1144,7 +1213,7 @@ img.leaflet-tile { image-rendering: auto; }
       <div class="form-group"><label>Companions</label><input type="text" id="fCompanions" placeholder="e.g. solo, with Alex & Sam"></div>
       <div class="form-group"><label>Notes / Journal</label><textarea id="fNotes" rows="4" placeholder="Your thoughts, highlights, memories..."></textarea></div>
       <div class="form-group"><label>Photo URLs (one per line)</label><textarea id="fPhotos" rows="2" placeholder="https://..."></textarea></div>
-      <div class="form-group"><label>Manual Coordinates (if no GPX) — <span style="color:var(--text-muted);text-transform:none;letter-spacing:0">JSON array of [lat, lng]</span></label><textarea id="fCoords" rows="2" placeholder='[[37.51, -121.88], [37.52, -121.87], ...]'></textarea></div>
+      <div class="form-group"><label>Manual Coordinates (if no GPX) — <span style="color:var(--text-muted);text-transform:none;letter-spacing:0">JSON array of [lat, lng]</span></label><textarea id="fCoords" rows="2" placeholder='[[37.51, -121.88], [37.52, -121.87], ...]'></textarea><button type="button" class="draw-coord-btn" onclick="startDrawMode()">✏ Draw on map</button></div>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal()">Cancel</button>
@@ -1187,6 +1256,26 @@ img.leaflet-tile { image-rendering: auto; }
     <div class="trim-panel-actions">
       <button class="btn" onclick="closeTrimModal()">Cancel</button>
       <button class="btn primary" id="trimApplyBtn" onclick="applyTrim()">Apply trim</button>
+    </div>
+  </div>
+</div>
+
+<!-- DRAW ON MAP PANEL -->
+<div class="draw-panel" id="drawPanel">
+  <div class="draw-panel-header">
+    <h2>✏ Draw trail</h2>
+    <button class="modal-close" onclick="cancelDrawing()">×</button>
+  </div>
+  <div class="draw-panel-body">
+    <p class="draw-info">Click on the map to add points. They'll be connected as a trail path.</p>
+    <div class="draw-stats">
+      <div><div class="draw-stat-val" id="drawPointCount">0</div><div class="draw-stat-label">Points</div></div>
+      <div><div class="draw-stat-val" id="drawDistance">0</div><div class="draw-stat-label">Miles</div></div>
+    </div>
+    <div class="draw-panel-actions">
+      <button class="btn" id="drawUndoBtn" onclick="undoDrawPoint()" disabled>Undo</button>
+      <button class="btn" onclick="cancelDrawing()">Cancel</button>
+      <button class="btn primary" id="drawFinishBtn" onclick="finishDrawing()" disabled>Done</button>
     </div>
   </div>
 </div>
@@ -2077,6 +2166,7 @@ function isTrailProminentInView(trailId) {
 }
 
 function onMapTrailClick(trailId) {
+  if (drawMode) return;
   const t = trails.find(x => x.id === trailId);
   if (!t) return;
   if (focusedTrailId === trailId || isTrailProminentInView(trailId)) {
@@ -2670,6 +2760,175 @@ function handleGPXFile(file) {
 }
 bindGpxInput();
 
+// ===== DRAW ON MAP =====
+let drawMode = false;
+let drawPoints = [];
+let drawLayers = { lines: [], dots: [], preview: null };
+let drawMapClickHandler = null;
+let drawMapMoveHandler = null;
+let drawSavedFormState = null;
+
+function startDrawMode() {
+  drawSavedFormState = {
+    editing: editingId,
+    name: document.getElementById('fName').value,
+    date: document.getElementById('fDate').value,
+    dateType: document.getElementById('fDate').type,
+    status: document.getElementById('fStatus').value,
+    distance: document.getElementById('fDistance').value,
+    elevation: document.getElementById('fElevation').value,
+    duration: document.getElementById('fDuration').value,
+    difficulty: document.getElementById('fDifficulty').value,
+    rating: currentRating,
+    tags: document.getElementById('fTags').value,
+    weather: document.getElementById('fWeather').value,
+    companions: document.getElementById('fCompanions').value,
+    notes: document.getElementById('fNotes').value,
+    photos: document.getElementById('fPhotos').value,
+    coords: document.getElementById('fCoords').value,
+    gpxTrackData, gpxSpeedData, gpxTimesData
+  };
+
+  const existing = document.getElementById('fCoords').value.trim();
+  drawPoints = [];
+  if (existing) {
+    try {
+      const parsed = JSON.parse(existing);
+      if (Array.isArray(parsed) && parsed.length >= 1) drawPoints = parsed.map(c => [c[0], c[1]]);
+    } catch {}
+  }
+
+  document.getElementById('modalOverlay').classList.remove('open');
+  drawMode = true;
+  document.body.classList.add('draw-mode-active');
+  document.getElementById('drawPanel').classList.add('open');
+
+  if (window.innerWidth <= 800) switchMobileTab('map', false);
+
+  drawRenderAll();
+
+  drawMapClickHandler = function(e) {
+    if (!drawMode) return;
+    drawPoints.push([Math.round(e.latlng.lat * 1e6) / 1e6, Math.round(e.latlng.lng * 1e6) / 1e6]);
+    drawRenderAll();
+  };
+
+  drawMapMoveHandler = function(e) {
+    if (!drawMode || drawPoints.length === 0) return;
+    if (drawLayers.preview) map.removeLayer(drawLayers.preview);
+    drawLayers.preview = L.polyline([drawPoints[drawPoints.length - 1], [e.latlng.lat, e.latlng.lng]], {
+      color: '#c7623a', weight: 3, opacity: 0.4, dashArray: '6,8', interactive: false
+    }).addTo(map);
+  };
+
+  map.on('click', drawMapClickHandler);
+  map.on('mousemove', drawMapMoveHandler);
+
+  if (drawPoints.length > 0) {
+    map.fitBounds(drawPoints.length > 1 ? L.latLngBounds(drawPoints) : [[drawPoints[0][0] - 0.01, drawPoints[0][1] - 0.01], [drawPoints[0][0] + 0.01, drawPoints[0][1] + 0.01]], { padding: [60, 60], maxZoom: 15 });
+  }
+}
+
+function drawRenderAll() {
+  drawLayers.lines.forEach(l => map.removeLayer(l));
+  drawLayers.dots.forEach(d => map.removeLayer(d));
+  if (drawLayers.preview) map.removeLayer(drawLayers.preview);
+  drawLayers = { lines: [], dots: [], preview: null };
+
+  if (drawPoints.length >= 2) {
+    const outline = L.polyline(drawPoints, { color: '#1a1a1e', weight: 8, opacity: 0.4, smoothFactor: 1, interactive: false }).addTo(map);
+    const line = L.polyline(drawPoints, { color: '#c7623a', weight: 5, opacity: 0.9, smoothFactor: 1, interactive: false }).addTo(map);
+    drawLayers.lines.push(outline, line);
+  }
+
+  drawPoints.forEach((pt, i) => {
+    const isFirst = i === 0;
+    const isLast = i === drawPoints.length - 1;
+    const dot = L.circleMarker(pt, {
+      radius: isFirst || isLast ? 7 : 4,
+      fillColor: isFirst ? '#2eaa55' : isLast ? '#e8552e' : '#c7623a',
+      color: '#fff', weight: 2, fillOpacity: 1, interactive: false
+    }).addTo(map);
+    drawLayers.dots.push(dot);
+  });
+
+  document.getElementById('drawPointCount').textContent = drawPoints.length;
+  document.getElementById('drawDistance').textContent = drawPoints.length >= 2 ? distanceFromCoords(drawPoints) : '0';
+  document.getElementById('drawUndoBtn').disabled = drawPoints.length === 0;
+  document.getElementById('drawFinishBtn').disabled = drawPoints.length < 2;
+}
+
+function undoDrawPoint() {
+  if (drawPoints.length > 0) {
+    drawPoints.pop();
+    drawRenderAll();
+  }
+}
+
+function cleanupDrawMode() {
+  drawMode = false;
+  document.body.classList.remove('draw-mode-active');
+  document.getElementById('drawPanel').classList.remove('open');
+  if (drawMapClickHandler) map.off('click', drawMapClickHandler);
+  if (drawMapMoveHandler) map.off('mousemove', drawMapMoveHandler);
+  drawMapClickHandler = null;
+  drawMapMoveHandler = null;
+  drawLayers.lines.forEach(l => map.removeLayer(l));
+  drawLayers.dots.forEach(d => map.removeLayer(d));
+  if (drawLayers.preview) map.removeLayer(drawLayers.preview);
+  drawLayers = { lines: [], dots: [], preview: null };
+}
+
+function restoreFormState() {
+  if (!drawSavedFormState) return;
+  const s = drawSavedFormState;
+  editingId = s.editing;
+  document.getElementById('fName').value = s.name;
+  const fd = document.getElementById('fDate'); fd.type = s.dateType; fd.value = s.date;
+  document.getElementById('fStatus').value = s.status;
+  document.getElementById('fDistance').value = s.distance;
+  document.getElementById('fElevation').value = s.elevation;
+  document.getElementById('fDuration').value = s.duration;
+  document.getElementById('fDifficulty').value = s.difficulty;
+  setStars(s.rating);
+  document.getElementById('fTags').value = s.tags;
+  document.getElementById('fWeather').value = s.weather;
+  document.getElementById('fCompanions').value = s.companions;
+  document.getElementById('fNotes').value = s.notes;
+  document.getElementById('fPhotos').value = s.photos;
+  gpxTrackData = s.gpxTrackData;
+  gpxSpeedData = s.gpxSpeedData;
+  gpxTimesData = s.gpxTimesData;
+  document.getElementById('modalTitle').textContent = editingId ? 'Edit Trail' : 'Add Trail';
+  document.getElementById('saveBtn').textContent = editingId ? 'Update Trail' : 'Save Trail';
+  renderModalTagPicker();
+}
+
+function finishDrawing() {
+  if (drawPoints.length < 2) return;
+  const coords = drawPoints.slice();
+  const dist = distanceFromCoords(coords);
+  cleanupDrawMode();
+  restoreFormState();
+  document.getElementById('fCoords').value = JSON.stringify(coords);
+  gpxTrackData = coords;
+  gpxSpeedData = null;
+  gpxTimesData = null;
+  gpxAutoFill('fDistance', dist, true);
+  document.getElementById('gpxDrop').innerHTML = `<div style="color:var(--green)">✓ Drawn track — ${coords.length} points, ${dist} mi</div>`;
+  document.getElementById('modalOverlay').classList.add('open');
+  drawSavedFormState = null;
+  drawPoints = [];
+}
+
+function cancelDrawing() {
+  cleanupDrawMode();
+  restoreFormState();
+  document.getElementById('modalOverlay').classList.add('open');
+  drawSavedFormState = null;
+  drawPoints = [];
+}
+
 // ===== DETAIL PANEL =====
 function openDetail(id) {
   const t = trails.find(x=>x.id===id); if (!t) return;
@@ -2916,6 +3175,7 @@ document.getElementById('sidebarToggle')?.addEventListener('click', () => {
 // ===== INIT =====
 loadTrails(); initMap();
 map.on('click', (e) => {
+  if (drawMode) return;
   if (focusedTrailId && !document.getElementById('detailPanel').classList.contains('open')) {
     focusedTrailId = null;
     selectedId = null;
