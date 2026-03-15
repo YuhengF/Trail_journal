@@ -286,21 +286,14 @@ body {
   width: 100%; background: var(--bg-input);
   border: 1px solid var(--border-light); border-radius: 8px;
   color: var(--text); font-family: inherit; font-size: 13px;
-  padding: 0 12px; outline: none; transition: border-color 0.15s;
-  height: 38px; line-height: 38px;
+  padding: 9px 12px; outline: none; transition: border-color 0.15s;
 }
-.form-group select {
-  appearance: none; -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: right 12px center;
-  padding-right: 30px;
-}
-.form-group textarea { padding: 9px 12px; height: auto; line-height: 1.5; resize: vertical; min-height: 70px; }
 
 .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: var(--accent); }
+.form-group textarea { resize: vertical; min-height: 70px; }
 .form-group select option { background: var(--bg-panel); }
-.form-row { display: flex; gap: 10px; align-items: flex-end; }
-.form-row .form-group { flex: 1; min-width: 0; }
+.form-row { display: flex; gap: 10px; }
+.form-row .form-group { flex: 1; }
 .form-group .star-input { display: flex; gap: 4px; }
 
 .form-group .star-input span {
@@ -765,10 +758,9 @@ img.leaflet-tile { image-rendering: auto; }
   .modal-body { padding: 16px 20px 20px; }
   .form-group label { font-size: 12px; margin-bottom: 6px; }
   .form-group input, .form-group textarea, .form-group select {
-    font-size: 16px; padding: 0 14px; border-radius: 10px;
-    height: 48px; line-height: 48px;
+    font-size: 16px; padding: 12px 14px; border-radius: 10px;
   }
-  .form-group textarea { padding: 12px 14px; height: auto; line-height: 1.5; }
+  .form-row { flex-direction: column; gap: 0; }
   .form-group .star-input span { font-size: 30px; }
   .modal-footer { padding: 0 20px 20px; padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); }
   .modal-footer .btn { padding: 14px 20px; font-size: 14px; }
