@@ -1594,6 +1594,25 @@ img.leaflet-tile { image-rendering: auto; }
         • Permissions → Contents: <strong>Read and write</strong><br>
         • The token never leaves your browser. Each device needs its own token entry.
       </p>
+
+      <div style="border-top:1px solid var(--border-light);margin:16px 0 12px;"></div>
+
+      <div class="form-group" style="margin-bottom:8px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input type="checkbox" id="ghEncrypt" onchange="toggleEncryptFields()">
+          <span>Encrypt my data <span style="color:var(--text-muted);text-transform:none;letter-spacing:0;font-weight:normal;">(only you can read it — not even the repo owner)</span></span>
+        </label>
+      </div>
+      <div id="encryptFields" style="display:none;">
+        <div class="form-group">
+          <label>Passphrase <span style="color:var(--text-muted);text-transform:none;letter-spacing:0">(use the same passphrase on all your devices)</span></label>
+          <input type="password" id="ghPassphrase" placeholder="my-secret-passphrase">
+        </div>
+        <p style="font-size:11px;line-height:1.5;margin-bottom:12px;padding:8px 10px;border-radius:6px;background:rgba(192,57,43,0.08);color:#c0392b;border:1px solid rgba(192,57,43,0.15);">
+          <strong>Warning:</strong> If you forget this passphrase, your data cannot be recovered. Nobody can help you — that's the point of encryption.
+        </p>
+      </div>
+
       <div id="syncTestResult"></div>
 
       <!-- Buttons inside scrollable area so they're never hidden by browser chrome -->
@@ -2037,6 +2056,81 @@ function blobToBase64(blob) {
   });
 }
 
+// ===== CLIENT-SIDE ENCRYPTION (AES-256-GCM + PBKDF2) =====
+const ENCRYPT_SALT_LEN = 16;
+const ENCRYPT_IV_LEN = 12;
+const ENCRYPT_ITERATIONS = 310000;
+
+async function deriveKey(passphrase, salt) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(passphrase), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: ENCRYPT_ITERATIONS, hash: 'SHA-256' },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+function toHex(buf) { return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join(''); }
+function fromHex(hex) { return new Uint8Array(hex.match(/.{2}/g).map(b => parseInt(b, 16))); }
+
+function uint8ToBase64(u8) {
+  const chunk = 8192;
+  let str = '';
+  for (let i = 0; i < u8.length; i += chunk) {
+    str += String.fromCharCode.apply(null, u8.subarray(i, i + chunk));
+  }
+  return btoa(str);
+}
+
+async function encryptJson(obj, passphrase) {
+  const salt = crypto.getRandomValues(new Uint8Array(ENCRYPT_SALT_LEN));
+  const iv = crypto.getRandomValues(new Uint8Array(ENCRYPT_IV_LEN));
+  const key = await deriveKey(passphrase, salt);
+  const plaintext = new TextEncoder().encode(JSON.stringify(obj, null, 2));
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext);
+  return {
+    encrypted: true,
+    salt: toHex(salt),
+    iv: toHex(iv),
+    data: uint8ToBase64(new Uint8Array(ciphertext))
+  };
+}
+
+async function decryptJson(envelope, passphrase) {
+  const salt = fromHex(envelope.salt);
+  const iv = fromHex(envelope.iv);
+  const key = await deriveKey(passphrase, salt);
+  const ciphertext = Uint8Array.from(atob(envelope.data), c => c.charCodeAt(0));
+  const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+  return JSON.parse(new TextDecoder().decode(plaintext));
+}
+
+async function encryptBlob(blob, passphrase) {
+  const salt = crypto.getRandomValues(new Uint8Array(ENCRYPT_SALT_LEN));
+  const iv = crypto.getRandomValues(new Uint8Array(ENCRYPT_IV_LEN));
+  const key = await deriveKey(passphrase, salt);
+  const plainBuf = await blob.arrayBuffer();
+  const cipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plainBuf);
+  const out = new Uint8Array(ENCRYPT_SALT_LEN + ENCRYPT_IV_LEN + cipherBuf.byteLength);
+  out.set(salt, 0);
+  out.set(iv, ENCRYPT_SALT_LEN);
+  out.set(new Uint8Array(cipherBuf), ENCRYPT_SALT_LEN + ENCRYPT_IV_LEN);
+  return out;
+}
+
+async function decryptBlob(buf, passphrase, type) {
+  const arr = new Uint8Array(buf);
+  const salt = arr.slice(0, ENCRYPT_SALT_LEN);
+  const iv = arr.slice(ENCRYPT_SALT_LEN, ENCRYPT_SALT_LEN + ENCRYPT_IV_LEN);
+  const ciphertext = arr.slice(ENCRYPT_SALT_LEN + ENCRYPT_IV_LEN);
+  const key = await deriveKey(passphrase, salt);
+  const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+  return new Blob([plainBuf], { type });
+}
+
 function base64ToBlob(b64, type) {
   const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);
@@ -2069,8 +2163,15 @@ async function syncPhotosToGitHub() {
     try {
       const blob = await getPhoto(id);
       if (!blob) continue;
-      const b64 = await blobToBase64(blob);
-      await fetch(`https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${photosDir}/${id}.jpg`, {
+      let b64;
+      if (cfg.encrypt && cfg.passphrase) {
+        const encrypted = await encryptBlob(blob, cfg.passphrase);
+        b64 = uint8ToBase64(encrypted);
+      } else {
+        b64 = await blobToBase64(blob);
+      }
+      const ext = (cfg.encrypt && cfg.passphrase) ? 'enc' : 'jpg';
+      await fetch(`https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${photosDir}/${id}.${ext}`, {
         method: 'PUT',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: `Add photo ${id}`, content: b64 })
@@ -2094,9 +2195,14 @@ async function syncPhotosFromGitHub() {
   const basePath = cfg.path.replace(/[^/]*$/, '');
   const photosDir = basePath + 'photos';
 
+  const isEncrypted = cfg.encrypt && cfg.passphrase;
   for (const id of missing) {
     try {
-      const res = await fetch(`https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${photosDir}/${id}.jpg`, { headers, cache: 'no-store' });
+      const ext = isEncrypted ? 'enc' : 'jpg';
+      let res = await fetch(`https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${photosDir}/${id}.${ext}`, { headers, cache: 'no-store' });
+      if (!res.ok && isEncrypted) {
+        res = await fetch(`https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${photosDir}/${id}.jpg`, { headers, cache: 'no-store' });
+      }
       if (!res.ok) continue;
       const meta = await res.json();
       let b64 = meta.content;
@@ -2105,8 +2211,15 @@ async function syncPhotosFromGitHub() {
         if (blobRes.ok) { const bd = await blobRes.json(); b64 = bd.content; }
       }
       if (b64) {
-        const blob = base64ToBlob(b64.replace(/\s/g, ''), 'image/jpeg');
-        await storePhoto(id, blob);
+        const clean = b64.replace(/\s/g, '');
+        if (isEncrypted && meta.name && meta.name.endsWith('.enc')) {
+          const raw = Uint8Array.from(atob(clean), c => c.charCodeAt(0));
+          const blob = await decryptBlob(raw, cfg.passphrase, 'image/jpeg');
+          await storePhoto(id, blob);
+        } else {
+          const blob = base64ToBlob(clean, 'image/jpeg');
+          await storePhoto(id, blob);
+        }
       }
     } catch (e) { console.warn('Photo download failed:', id, e); }
   }
@@ -2132,9 +2245,20 @@ function openSettings() {
     document.getElementById('ghRepo').value = cfg.repo || '';
     document.getElementById('ghToken').value = cfg.token || '';
     document.getElementById('ghPath').value = cfg.path || 'data.json';
+    document.getElementById('ghEncrypt').checked = !!cfg.encrypt;
+    document.getElementById('ghPassphrase').value = cfg.passphrase || '';
+  } else {
+    document.getElementById('ghEncrypt').checked = false;
+    document.getElementById('ghPassphrase').value = '';
   }
+  toggleEncryptFields();
   document.getElementById('syncTestResult').innerHTML = '';
   document.getElementById('settingsOverlay').classList.add('open');
+}
+
+function toggleEncryptFields() {
+  document.getElementById('encryptFields').style.display =
+    document.getElementById('ghEncrypt').checked ? 'block' : 'none';
 }
 
 function closeSettings(e) {
@@ -2143,6 +2267,8 @@ function closeSettings(e) {
 }
 
 function saveSyncConfig() {
+  const encrypt = document.getElementById('ghEncrypt').checked;
+  const passphrase = document.getElementById('ghPassphrase').value;
   const cfg = {
     user: document.getElementById('ghUser').value.trim(),
     repo: document.getElementById('ghRepo').value.trim(),
@@ -2152,6 +2278,14 @@ function saveSyncConfig() {
   if (!cfg.user || !cfg.repo || !cfg.token) {
     document.getElementById('syncTestResult').innerHTML = '<div style="color:#c0392b;font-size:12px;">Please fill in all fields.</div>';
     return;
+  }
+  if (encrypt && !passphrase) {
+    document.getElementById('syncTestResult').innerHTML = '<div style="color:#c0392b;font-size:12px;">Please enter a passphrase for encryption.</div>';
+    return;
+  }
+  if (encrypt) {
+    cfg.encrypt = true;
+    cfg.passphrase = passphrase;
   }
   localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify(cfg));
   trails = trails.filter(t => !t._sample);
@@ -2189,9 +2323,27 @@ async function testSync() {
 
     if (file.status === 200) {
       if (file.data) {
-        const trailCount = Array.isArray(file.data) ? file.data.length : (file.data?.trails?.length || 0);
+        const encrypt = document.getElementById('ghEncrypt').checked;
+        const passphrase = document.getElementById('ghPassphrase').value;
+        let data = file.data;
+
+        if (data.encrypted) {
+          if (!encrypt || !passphrase) {
+            result.innerHTML = '<div style="color:#c0392b;font-size:12px;">✕ Remote data is encrypted. Enable encryption and enter your passphrase.</div>';
+            return;
+          }
+          try {
+            data = await decryptJson(data, passphrase);
+          } catch {
+            result.innerHTML = '<div style="color:#c0392b;font-size:12px;">✕ Decryption failed — wrong passphrase?</div>';
+            return;
+          }
+        }
+
+        const trailCount = Array.isArray(data) ? data.length : (data?.trails?.length || 0);
         const sizeMB = file.size ? (file.size / 1048576).toFixed(1) : null;
         let msg = `✓ Connected! Found ${trailCount} trail(s) in repo.`;
+        if (data.encrypted === undefined && encrypt) msg += ' Encryption will be applied on next sync.';
         if (file.large) msg += ` Retrieved via Blobs API (${sizeMB} MB).`;
         if (sizeMB && parseFloat(sizeMB) > 5) msg += `<br><span style="color:var(--accent);">⚠ Large file — consider trimming or archiving old GPS tracks.</span>`;
         result.innerHTML = `<div style="color:var(--green);font-size:12px;">${msg}</div>`;
@@ -2304,11 +2456,24 @@ async function syncFromGitHub() {
 
     if (file.status === 200) {
       ghSha = file.sha;
-      const raw = file.data;
+      let raw = file.data;
       if (raw == null) {
         const sizeMB = file.size ? `(${(file.size / 1048576).toFixed(1)} MB)` : '';
         updateSyncStatus('error', file.error || `Data file unreadable ${sizeMB}`);
         return;
+      }
+
+      if (raw.encrypted) {
+        if (!cfg.encrypt || !cfg.passphrase) {
+          updateSyncStatus('error', 'Remote data is encrypted — enter passphrase in settings');
+          return;
+        }
+        try {
+          raw = await decryptJson(raw, cfg.passphrase);
+        } catch {
+          updateSyncStatus('error', 'Decryption failed — wrong passphrase?');
+          return;
+        }
       }
 
       // Support both old format (plain array) and new format ({ trails, tombstones })
@@ -2387,7 +2552,11 @@ async function syncToGitHub() {
 
   try {
     const payload = { trails: trails.filter(t => !t._sample).map(compressTrailForStorage), tombstones: getTombstones() };
-    const content = btoa(unescape(encodeURIComponent(JSON.stringify(payload, null, 2))));
+    let finalPayload = payload;
+    if (cfg.encrypt && cfg.passphrase) {
+      finalPayload = await encryptJson(payload, cfg.passphrase);
+    }
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(finalPayload, null, 2))));
     const body = {
       message: `Update trails — ${new Date().toISOString().split('T')[0]}`,
       content: content
