@@ -3754,7 +3754,19 @@ document.addEventListener('touchstart', (e) => {
 function toggleMobileTab(tab) {
   const current = document.querySelector('.mobile-tab.active');
   if (current && current.dataset.tab === tab) {
-    switchMobileTab(tab === 'list' ? 'map' : 'list');
+    if (tab === 'map') {
+      // Already on map — zoom out to fit all trails instead of opening sidebar
+      if (savedMapView) { map.setView(savedMapView.center, savedMapView.zoom); savedMapView = null; }
+      else {
+        const bounds = [];
+        getFilteredTrails().forEach(t => { if (t.coords) t.coords.forEach(c => bounds.push(c)); });
+        if (bounds.length > 0) map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 });
+        else map.setView([37.87, -122.27], 10);
+      }
+      if (focusedTrailId) { focusedTrailId = null; selectedId = null; resetMapHighlight(); renderList(); }
+    } else {
+      switchMobileTab('map');
+    }
   } else {
     switchMobileTab(tab);
   }
