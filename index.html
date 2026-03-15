@@ -517,7 +517,7 @@ body {
   background: var(--accent-soft);
   border-left: 3px solid var(--accent); padding-left: 9px;
 }
-.batch-queue-item.saved { opacity: 0.55; cursor: default; }
+.batch-queue-item.saved { opacity: 0.55; }
 .batch-queue-item .bq-status {
   width: 16px; height: 16px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center; font-size: 10px;
@@ -538,6 +538,16 @@ body {
   flex-shrink: 0; color: var(--text-muted); font-size: 11px;
   font-family: 'JetBrains Mono', monospace;
 }
+.batch-queue-item .bq-remove {
+  flex-shrink: 0; width: 20px; height: 20px; border: none; background: none;
+  color: var(--text-muted); font-size: 13px; cursor: pointer; border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+.batch-queue-item:hover .bq-remove { opacity: 1; }
+.batch-queue-item .bq-remove:hover { background: rgba(192,57,43,0.12); color: #c0392b; }
+.batch-queue-item.saved .bq-remove { opacity: 0.6; }
+.batch-queue-item.saved:hover .bq-remove { opacity: 1; }
 .batch-save-all {
   padding: 8px 12px; background: var(--bg-card);
   border-top: 1px solid var(--border-light); text-align: center;
@@ -3409,6 +3419,7 @@ async function saveTrail() {
 
   if (batchQueue.length > 0 && batchCurrentIdx >= 0) {
     batchQueue[batchCurrentIdx].saved = true;
+    batchQueue[batchCurrentIdx].savedTrailId = trail.id;
     renderList(); renderMap();
     const nextIdx = batchQueue.findIndex((b, i) => i > batchCurrentIdx && !b.saved);
     const fallbackIdx = batchQueue.findIndex(b => !b.saved);
@@ -3648,23 +3659,25 @@ function renderBatchQueue() {
   h += `<span class="batch-count">${savedCount} of ${total} trail${total !== 1 ? 's' : ''} saved</span>`;
   h += '<div class="batch-queue-actions">';
   h += '<button onclick="addMoreBatchFiles()">+ Add</button>';
-  h += '<button onclick="clearBatchQueue()">✕ Clear</button>';
+  h += '<button onclick="clearBatchQueue()">✕ Clear All</button>';
   h += '</div></div>';
   h += '<div class="batch-queue-list">';
   batchQueue.forEach((item, i) => {
     const isActive = i === batchCurrentIdx;
     const cls = ['batch-queue-item', isActive ? 'active' : '', item.saved ? 'saved' : ''].filter(Boolean).join(' ');
+    const clickAction = item.saved ? `unsaveBatchItem(${i})` : `selectBatchItem(${i})`;
     const statusIcon = item.saved
-      ? '<span class="bq-status">✓</span>'
+      ? '<span class="bq-status" title="Saved — click to undo">✓</span>'
       : '<span class="bq-status"><span class="dot"></span></span>';
     const stats = [
       item.parsed.distance ? item.parsed.distance + 'mi' : '',
       item.parsed.elevation ? '▲' + item.parsed.elevation + 'ft' : ''
     ].filter(Boolean).join(' ');
-    h += `<div class="${cls}" onclick="selectBatchItem(${i})">`;
+    h += `<div class="${cls}" onclick="${clickAction}">`;
     h += statusIcon;
     h += `<span class="bq-name">${item.name}</span>`;
     if (stats) h += `<span class="bq-stats">${stats}</span>`;
+    h += `<button class="bq-remove" onclick="removeBatchItem(${i},event)" title="Remove">✕</button>`;
     h += '</div>';
   });
   h += '</div>';
@@ -3736,7 +3749,44 @@ function updateBatchSaveButton() {
   else btn.textContent = 'All Saved \u2014 Close';
 }
 
+function removeBatchItem(idx, evt) {
+  if (evt) evt.stopPropagation();
+  if (idx < 0 || idx >= batchQueue.length) return;
+  const item = batchQueue[idx];
+  if (item.saved && item.savedTrailId) {
+    trails = trails.filter(t => t.id !== item.savedTrailId);
+    saveData();
+  }
+  batchQueue.splice(idx, 1);
+  if (!batchQueue.length) { clearBatchQueue(); renderList(); renderMap(); return; }
+  if (batchCurrentIdx === idx) {
+    const next = batchQueue.findIndex(b => !b.saved);
+    if (next >= 0) selectBatchItem(next);
+    else { batchCurrentIdx = -1; clearForm(); }
+  } else if (batchCurrentIdx > idx) {
+    batchCurrentIdx--;
+  }
+  renderBatchQueue(); updateBatchSaveButton(); renderList(); renderMap();
+}
+
+function unsaveBatchItem(idx) {
+  if (idx < 0 || idx >= batchQueue.length || !batchQueue[idx].saved) return;
+  const item = batchQueue[idx];
+  if (item.savedTrailId) {
+    trails = trails.filter(t => t.id !== item.savedTrailId);
+    saveData(); renderList(); renderMap();
+  }
+  item.saved = false;
+  item.savedTrailId = null;
+  selectBatchItem(idx);
+}
+
 function clearBatchQueue() {
+  const savedIds = batchQueue.filter(b => b.saved && b.savedTrailId).map(b => b.savedTrailId);
+  if (savedIds.length) {
+    trails = trails.filter(t => !savedIds.includes(t.id));
+    saveData(); renderList(); renderMap();
+  }
   batchQueue = []; batchCurrentIdx = -1;
   document.getElementById('batchQueue').innerHTML = '';
   const gpxDrop = document.getElementById('gpxDrop');
@@ -3763,8 +3813,9 @@ async function saveAllBatch() {
     let coords = item.gpxData.trackData;
     if (!coords) { try { const raw = (fs.coords || '').trim(); if (raw) coords = JSON.parse(raw); } catch(e) {} }
     const timesArr = item.gpxData.timesData;
+    const tid = genId();
     trails.push({
-      id: genId(), name,
+      id: tid, name,
       date: fs.date || '', status: fs.status || 'completed',
       distance: fs.distance || '', elevation: fs.elevation || '',
       duration: fs.duration || '', difficulty: fs.difficulty || '',
@@ -3781,6 +3832,7 @@ async function saveAllBatch() {
       updatedAt: Date.now()
     });
     batchQueue[i].saved = true;
+    batchQueue[i].savedTrailId = tid;
   }
   saveData();
   closeModal();
