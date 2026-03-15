@@ -18,7 +18,7 @@ I used claude to write this app to track my personal hiking record. I tried to i
 
 ## Why I save the data in this way:
 Just so I don't need any server or datasync services other than github. There're a million of other ways, but this way is the most viable if someone wants to deploy this app when they have and only have a github account.
-Next step to simplify for new user. I need to wrap things up using only account name and passphrase.
+Next step to simplify for new user, I might wrap things up using only account name and passphrase (but then this will be a bit unfriendly as the interfaces are hidden for people who wants to deploy their page or create their own data repo and then they need to modify this html file as well to look for the interfacing point).
 
 
 ## Notes for myself or users who want to know how I store their data under my github account:
