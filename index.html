@@ -4032,6 +4032,7 @@ function cancelDrawing() {
 // ===== DETAIL PANEL =====
 function openDetail(id) {
   const t = trails.find(x=>x.id===id); if (!t) return;
+  if (trimTrailId) closeTrimModal();
   selectedId = id; focusedTrailId = null; renderList();
   document.getElementById('detailName').textContent = t.name;
   let h = `<div class="detail-stat-grid">`;
@@ -4329,7 +4330,11 @@ if (localStorage.getItem(STORAGE_KEY) === null && !getSyncConfig()) {
     .then(r => r.ok ? r.json() : Promise.reject())
     .then(data => {
       if (trails.length === 0 && localStorage.getItem(STORAGE_KEY) === null && !getSyncConfig()) {
-        trails = data.map(t => ({ ...t, _sample: true }));
+        trails = data.map(t => {
+          if (t.gpxTimes) t.gpxTimes = decompressGpxTimes(t.gpxTimes);
+          if (t.coords) t.coords = t.coords.map(c => [Math.round(c[0]*1e6)/1e6, Math.round(c[1]*1e6)/1e6]);
+          return { ...t, _sample: true };
+        });
         renderList(); renderMap();
       }
     })
