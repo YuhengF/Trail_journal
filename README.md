@@ -12,7 +12,7 @@ I used claude to write this app to track my personal hiking record. I tried to i
 ### If you want to do everything yourself:
 
 1. (Optional) Fork the repo. Make sure it's set to public so you can enable **Page** function on github;
-2. Create your own private data managing repo (say "my_data") on your own github (note this page can run on my github while you own your own data repo), and then enable a fine-grained token to access this my_data repo;
+2. Create your own private data managing repo (say "my_data") on your own github (note this page can be hosted on my github while you own your own data repo)(slightly more tech details: you can "use" my Page but store data elsewhere is because it's a pure frontend setup, and the rendering work is done on your browser, and there's no server/backend behind this Page app on my side). And then enable a fine-grained token to access this my_data repo;
 3. In the first time setup of the app, access the page hosting this trail journal html (would be something like https://yuhengf.github.io/Trail_journal/ but under your own github), and then click **sync** button. Fill in the token etc info to access your private data;
 4. The trails data rely on GPX files (.GPX is a GPS data format). One way to obtain it is to export apple watch health data (you can easily find your workout routes in GPX format in the exported zip).
 
