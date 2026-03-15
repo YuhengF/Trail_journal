@@ -2598,19 +2598,18 @@ function niceElevTicks(min, max, count) {
   const range = max - min || 1;
   const rough = range / (count - 1);
   const steps = [50, 100, 200, 250, 500, 1000, 2000, 2500, 5000];
-  let step = steps.find(s => s >= rough) || Math.ceil(rough / 1000) * 1000;
+  const step = steps.find(s => s >= rough) || Math.ceil(rough / 1000) * 1000;
   const lo = Math.floor(min / step) * step;
+  const hi = Math.ceil(max / step) * step;
   const ticks = [];
-  for (let v = lo; v <= max + step * 0.01; v += step) {
-    if (v >= min - step * 0.1) ticks.push(v);
-  }
+  for (let v = lo; v <= hi + step * 0.01; v += step) ticks.push(v);
   return ticks;
 }
 
 function niceDistTicks(maxMi, count) {
   const rough = maxMi / count;
   const steps = [0.25, 0.5, 1, 2, 2.5, 5, 10, 20, 25, 50];
-  let step = steps.find(s => s >= rough) || Math.ceil(rough / 10) * 10;
+  const step = steps.find(s => s >= rough) || Math.ceil(rough / 10) * 10;
   const ticks = [];
   for (let v = 0; v <= maxMi + step * 0.01; v += step) ticks.push(v);
   return ticks;
@@ -2665,76 +2664,48 @@ function drawElevCanvas(canvas, elevs, coords) {
   ctx.scale(dpr, dpr);
 
   const FONT = 'JetBrains Mono, monospace';
-  const pad = { top: 10, bottom: 20, left: 44, right: 10 };
+  const pad = { top: 6, bottom: 18, left: 4, right: 50 };
   const pw = cssW - pad.left - pad.right, ph = cssH - pad.top - pad.bottom;
 
   const toX = d => pad.left + (d / (totalDistMi || 1)) * pw;
   const toYv = v => pad.top + ph - ((v - yMin) / yRange) * ph;
 
-  // --- Y-axis: grid lines, tick marks, labels ---
+  // --- Y-axis labels on the RIGHT side, "{value} ft" inline ---
   ctx.font = `9px ${FONT}`;
-  ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
-  yTicks.forEach(v => {
+  ctx.textAlign = 'left';
+  yTicks.forEach((v, idx) => {
     const y = Math.round(toYv(v)) + 0.5;
-    // grid line
+    // faint grid line
+    ctx.setLineDash([2, 3]);
     ctx.beginPath();
     ctx.moveTo(pad.left, y);
     ctx.lineTo(pad.left + pw, y);
-    ctx.strokeStyle = 'rgba(0,0,0,0.07)';
+    ctx.strokeStyle = 'rgba(0,0,0,0.08)';
     ctx.lineWidth = 1;
     ctx.stroke();
-    // tick mark
-    ctx.beginPath();
-    ctx.moveTo(pad.left - 3, y);
-    ctx.lineTo(pad.left, y);
-    ctx.strokeStyle = '#9e978e';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    // label
+    ctx.setLineDash([]);
+    // label on the right
     ctx.fillStyle = '#6b6660';
-    const label = v >= 10000 ? (v/1000).toFixed(0)+'k' : v.toLocaleString();
-    ctx.fillText(label, pad.left - 6, y);
+    const label = (v >= 10000 ? (v/1000).toFixed(0)+'k' : v.toLocaleString()) + ' ft';
+    ctx.fillText(label, pad.left + pw + 6, y);
   });
 
-  // Y-axis unit label
-  ctx.font = `bold 8px ${FONT}`;
-  ctx.textAlign = 'right';
-  ctx.textBaseline = 'bottom';
-  ctx.fillStyle = '#9e978e';
-  ctx.fillText('ft', pad.left - 6, pad.top - 1);
-
-  // --- X-axis: tick marks + labels ---
-  ctx.font = `9px ${FONT}`;
+  // --- X-axis labels, "{value} mi" inline ---
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   xTicks.forEach(d => {
     if (d > totalDistMi * 1.01) return;
-    const x = Math.round(toX(d)) + 0.5;
-    // tick mark
-    ctx.beginPath();
-    ctx.moveTo(x, pad.top + ph);
-    ctx.lineTo(x, pad.top + ph + 4);
-    ctx.strokeStyle = '#9e978e';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    // label
+    const x = Math.round(toX(d));
     ctx.fillStyle = '#6b6660';
-    ctx.fillText(d % 1 === 0 ? d.toFixed(0) : d.toFixed(1), x, pad.top + ph + 6);
+    const label = (d % 1 === 0 ? d.toFixed(0) : d.toFixed(1)) + ' mi';
+    ctx.fillText(label, x, pad.top + ph + 5);
   });
-
-  // X-axis unit label
-  ctx.font = `bold 8px ${FONT}`;
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.fillStyle = '#9e978e';
-  const lastXTick = xTicks.filter(d => d <= totalDistMi * 1.01).pop() || 0;
-  ctx.fillText('mi', toX(lastXTick) + 10, pad.top + ph + 6);
 
   // --- Chart: filled area ---
   const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + ph);
-  grad.addColorStop(0, 'rgba(199, 98, 58, 0.28)');
-  grad.addColorStop(1, 'rgba(199, 98, 58, 0.03)');
+  grad.addColorStop(0, 'rgba(199, 98, 58, 0.22)');
+  grad.addColorStop(1, 'rgba(199, 98, 58, 0.02)');
   ctx.beginPath();
   ctx.moveTo(toX(cumDistMi[0]), toYv(yMin));
   for (let i = 0; i < n; i++) ctx.lineTo(toX(cumDistMi[i]), toYv(smoothed[i]));
@@ -2747,19 +2718,10 @@ function drawElevCanvas(canvas, elevs, coords) {
   ctx.beginPath();
   ctx.moveTo(toX(cumDistMi[0]), toYv(smoothed[0]));
   for (let i = 1; i < n; i++) ctx.lineTo(toX(cumDistMi[i]), toYv(smoothed[i]));
-  ctx.strokeStyle = '#c7623a';
+  ctx.strokeStyle = '#3a3530';
   ctx.lineWidth = 1.5;
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
-  ctx.stroke();
-
-  // --- Axis lines (L-shape) ---
-  ctx.beginPath();
-  ctx.moveTo(pad.left, pad.top);
-  ctx.lineTo(pad.left, pad.top + ph);
-  ctx.lineTo(pad.left + pw, pad.top + ph);
-  ctx.strokeStyle = 'rgba(0,0,0,0.12)';
-  ctx.lineWidth = 1;
   ctx.stroke();
 }
 
@@ -3125,13 +3087,30 @@ function closeTrimModal() {
 function applyTrim() {
   const t = trails.find(x => x.id === trimTrailId);
   if (!t || !t.coords) return;
+  const origN = t.coords.length;
   const start = parseInt(document.getElementById('trimStart').value, 10);
   const end = parseInt(document.getElementById('trimEnd').value, 10);
   const trimmed = t.coords.slice(start - 1, end);
   if (trimmed.length < 2) return;
+  if (t.gpxElevations && t.gpxElevations.length > 1) {
+    const elevN = t.gpxElevations.length;
+    const newElevs = [];
+    for (let i = start - 1; i < end; i++) {
+      const elevIdx = (i / (origN - 1)) * (elevN - 1);
+      const lo = Math.floor(elevIdx), hi = Math.min(Math.ceil(elevIdx), elevN - 1);
+      const frac = elevIdx - lo;
+      newElevs.push(t.gpxElevations[lo] * (1 - frac) + t.gpxElevations[hi] * frac);
+    }
+    let gain = 0;
+    for (let i = 1; i < newElevs.length; i++) {
+      const d = newElevs[i] - newElevs[i-1];
+      if (d > 0) gain += d;
+    }
+    t.elevation = Math.round(gain * 3.28084).toString();
+    t.gpxElevations = compressElevations(newElevs);
+  }
   t.coords = trimmed;
   t.speedData = null;
-  t.gpxElevations = null;
   t.distance = distanceFromCoords(trimmed);
   if (t.gpxTimes) {
     t.gpxTimes = t.gpxTimes.slice(start - 1, end);
