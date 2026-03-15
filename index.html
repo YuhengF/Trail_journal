@@ -118,6 +118,7 @@ body {
 
 .search-box input::placeholder { color: var(--text-muted); }
 
+.filter-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .filter-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 
 .chip {
@@ -1029,23 +1030,21 @@ img.leaflet-tile { image-rendering: auto; }
 }
 
 /* ===== TAG FILTER SYSTEM ===== */
-.sort-row {
-  display: flex; align-items: center; gap: 6px;
-  position: relative;
-}
+.sort-anchor { position: relative; flex-shrink: 0; }
 .sort-btn {
-  font-size: 11px; padding: 4px 10px; border-radius: 20px;
-  border: 1px solid var(--border); background: none;
-  color: var(--text-dim); cursor: pointer; font-family: inherit;
-  transition: all 0.15s; display: flex; align-items: center; gap: 4px;
-  white-space: nowrap;
+  font-size: 11px; padding: 4px 10px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--bg-input);
+  color: var(--text-dim); cursor: pointer; font-family: 'JetBrains Mono', monospace;
+  transition: all 0.15s; display: inline-flex; align-items: center; gap: 3px;
+  white-space: nowrap; letter-spacing: -0.2px;
 }
-.sort-btn:hover { border-color: var(--text-muted); background: var(--bg-hover); }
+.sort-btn:hover { border-color: var(--text-muted); background: var(--bg-hover); color: var(--text); }
 .sort-btn.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 500; }
-.sort-btn .sort-arrow { font-size: 9px; opacity: 0.7; }
+.sort-btn .sort-arrow { font-size: 12px; opacity: 0.6; }
+.sort-btn .sort-caret { font-size: 8px; opacity: 0.45; margin-left: 1px; }
 
 .sort-dropdown {
-  position: absolute; top: calc(100% + 4px); left: 0; z-index: 200;
+  position: absolute; top: calc(100% + 4px); right: 0; z-index: 200;
   background: var(--bg-panel); border: 1px solid var(--border);
   border-radius: var(--radius); box-shadow: var(--shadow-lg);
   min-width: 180px; padding: 4px 0;
@@ -1298,40 +1297,41 @@ img.leaflet-tile { image-rendering: auto; }
         <span style="color:var(--text-muted)">⌕</span>
         <input type="text" id="searchInput" placeholder="Search trails, tags, notes...">
       </div>
-      <div class="filter-chips">
-        <button class="chip active" data-filter="all">All</button>
-        <button class="chip" data-filter="completed">✓ Completed</button>
-        <button class="chip" data-filter="wishlist">★ Wishlist</button>
-        <button class="chip" data-filter="5star">5★ Only</button>
-      </div>
-      <div class="sort-row" id="sortRow">
-        <button class="sort-btn" id="sortBtn" onclick="toggleSortDropdown(event)">
-          <span class="sort-arrow">⇅</span> <span id="sortLabel">Date ↓</span>
-        </button>
-        <div class="sort-dropdown" id="sortDropdown">
-          <button class="sort-option selected" data-sort="date-desc" onclick="setSort('date-desc')"><span class="sort-opt-icon">📅</span> Date<span class="sort-opt-dir">newest first</span></button>
-          <button class="sort-option" data-sort="date-asc" onclick="setSort('date-asc')"><span class="sort-opt-icon">📅</span> Date<span class="sort-opt-dir">oldest first</span></button>
-          <div class="sort-divider"></div>
-          <button class="sort-option" data-sort="added-desc" onclick="setSort('added-desc')"><span class="sort-opt-icon">🕐</span> Added<span class="sort-opt-dir">newest first</span></button>
-          <button class="sort-option" data-sort="added-asc" onclick="setSort('added-asc')"><span class="sort-opt-icon">🕐</span> Added<span class="sort-opt-dir">oldest first</span></button>
-          <div class="sort-divider"></div>
-          <button class="sort-option" data-sort="name-asc" onclick="setSort('name-asc')"><span class="sort-opt-icon">Aa</span> Name<span class="sort-opt-dir">A → Z</span></button>
-          <button class="sort-option" data-sort="name-desc" onclick="setSort('name-desc')"><span class="sort-opt-icon">Aa</span> Name<span class="sort-opt-dir">Z → A</span></button>
-          <div class="sort-divider"></div>
-          <button class="sort-option" data-sort="distance-desc" onclick="setSort('distance-desc')"><span class="sort-opt-icon">↔</span> Distance<span class="sort-opt-dir">longest first</span></button>
-          <button class="sort-option" data-sort="distance-asc" onclick="setSort('distance-asc')"><span class="sort-opt-icon">↔</span> Distance<span class="sort-opt-dir">shortest first</span></button>
-          <div class="sort-divider"></div>
-          <button class="sort-option" data-sort="duration-desc" onclick="setSort('duration-desc')"><span class="sort-opt-icon">⏱</span> Duration<span class="sort-opt-dir">longest first</span></button>
-          <button class="sort-option" data-sort="duration-asc" onclick="setSort('duration-asc')"><span class="sort-opt-icon">⏱</span> Duration<span class="sort-opt-dir">shortest first</span></button>
-          <div class="sort-divider"></div>
-          <button class="sort-option" data-sort="elevation-desc" onclick="setSort('elevation-desc')"><span class="sort-opt-icon">▲</span> Elevation<span class="sort-opt-dir">most first</span></button>
-          <button class="sort-option" data-sort="elevation-asc" onclick="setSort('elevation-asc')"><span class="sort-opt-icon">▲</span> Elevation<span class="sort-opt-dir">least first</span></button>
-          <div class="sort-divider"></div>
-          <button class="sort-option" data-sort="rating-desc" onclick="setSort('rating-desc')"><span class="sort-opt-icon">★</span> Rating<span class="sort-opt-dir">highest first</span></button>
-          <button class="sort-option" data-sort="rating-asc" onclick="setSort('rating-asc')"><span class="sort-opt-icon">★</span> Rating<span class="sort-opt-dir">lowest first</span></button>
-          <div class="sort-divider"></div>
-          <button class="sort-option" data-sort="start-desc" onclick="setSort('start-desc')"><span class="sort-opt-icon">🌄</span> Start Time<span class="sort-opt-dir">latest first</span></button>
-          <button class="sort-option" data-sort="start-asc" onclick="setSort('start-asc')"><span class="sort-opt-icon">🌄</span> Start Time<span class="sort-opt-dir">earliest first</span></button>
+      <div class="filter-row">
+        <div class="filter-chips">
+          <button class="chip active" data-filter="all">All</button>
+          <button class="chip" data-filter="completed">✓ Completed</button>
+          <button class="chip" data-filter="wishlist">★ Wishlist</button>
+        </div>
+        <div class="sort-anchor">
+          <button class="sort-btn" id="sortBtn" onclick="toggleSortDropdown(event)">
+            <span class="sort-arrow">⇅</span> Sort: <span id="sortLabel">Date ↓</span> <span class="sort-caret">▾</span>
+          </button>
+          <div class="sort-dropdown" id="sortDropdown">
+            <button class="sort-option selected" data-sort="date-desc" onclick="setSort('date-desc')"><span class="sort-opt-icon">📅</span> Date<span class="sort-opt-dir">newest first</span></button>
+            <button class="sort-option" data-sort="date-asc" onclick="setSort('date-asc')"><span class="sort-opt-icon">📅</span> Date<span class="sort-opt-dir">oldest first</span></button>
+            <div class="sort-divider"></div>
+            <button class="sort-option" data-sort="added-desc" onclick="setSort('added-desc')"><span class="sort-opt-icon">🕐</span> Added<span class="sort-opt-dir">newest first</span></button>
+            <button class="sort-option" data-sort="added-asc" onclick="setSort('added-asc')"><span class="sort-opt-icon">🕐</span> Added<span class="sort-opt-dir">oldest first</span></button>
+            <div class="sort-divider"></div>
+            <button class="sort-option" data-sort="name-asc" onclick="setSort('name-asc')"><span class="sort-opt-icon">Aa</span> Name<span class="sort-opt-dir">A → Z</span></button>
+            <button class="sort-option" data-sort="name-desc" onclick="setSort('name-desc')"><span class="sort-opt-icon">Aa</span> Name<span class="sort-opt-dir">Z → A</span></button>
+            <div class="sort-divider"></div>
+            <button class="sort-option" data-sort="distance-desc" onclick="setSort('distance-desc')"><span class="sort-opt-icon">↔</span> Distance<span class="sort-opt-dir">longest first</span></button>
+            <button class="sort-option" data-sort="distance-asc" onclick="setSort('distance-asc')"><span class="sort-opt-icon">↔</span> Distance<span class="sort-opt-dir">shortest first</span></button>
+            <div class="sort-divider"></div>
+            <button class="sort-option" data-sort="duration-desc" onclick="setSort('duration-desc')"><span class="sort-opt-icon">⏱</span> Duration<span class="sort-opt-dir">longest first</span></button>
+            <button class="sort-option" data-sort="duration-asc" onclick="setSort('duration-asc')"><span class="sort-opt-icon">⏱</span> Duration<span class="sort-opt-dir">shortest first</span></button>
+            <div class="sort-divider"></div>
+            <button class="sort-option" data-sort="elevation-desc" onclick="setSort('elevation-desc')"><span class="sort-opt-icon">▲</span> Elevation<span class="sort-opt-dir">most first</span></button>
+            <button class="sort-option" data-sort="elevation-asc" onclick="setSort('elevation-asc')"><span class="sort-opt-icon">▲</span> Elevation<span class="sort-opt-dir">least first</span></button>
+            <div class="sort-divider"></div>
+            <button class="sort-option" data-sort="rating-desc" onclick="setSort('rating-desc')"><span class="sort-opt-icon">★</span> Rating<span class="sort-opt-dir">highest first</span></button>
+            <button class="sort-option" data-sort="rating-asc" onclick="setSort('rating-asc')"><span class="sort-opt-icon">★</span> Rating<span class="sort-opt-dir">lowest first</span></button>
+            <div class="sort-divider"></div>
+            <button class="sort-option" data-sort="start-desc" onclick="setSort('start-desc')"><span class="sort-opt-icon">🌄</span> Start Time<span class="sort-opt-dir">latest first</span></button>
+            <button class="sort-option" data-sort="start-asc" onclick="setSort('start-asc')"><span class="sort-opt-icon">🌄</span> Start Time<span class="sort-opt-dir">earliest first</span></button>
+          </div>
         </div>
       </div>
       <div class="tag-filter-row" id="tagFilterRow"></div>
@@ -2456,7 +2456,6 @@ function getFilteredTrails() {
   return trails.filter(t => {
     if (filter === 'completed' && t.status !== 'completed') return false;
     if (filter === 'wishlist' && t.status !== 'wishlist') return false;
-    if (filter === '5star' && t.rating !== 5) return false;
     if (activeTagFilters.length > 0) {
       const trailTags = (t.tags || []).map(tg => tg.toLowerCase());
       if (!activeTagFilters.every(f => trailTags.some(tg => tg === f.toLowerCase()))) return false;
