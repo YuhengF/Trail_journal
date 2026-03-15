@@ -20,7 +20,7 @@ I used claude to write this app to track my personal hiking record. I tried to i
 Just so I don't need any server or datasync services other than github. There're a million of other ways, but this way is the most viable if someone wants to deploy this app when they have and only have a github account.
 Next step to simplify for new user, I might wrap things up using only account name and passphrase (but then this will be a bit unfriendly as the interfaces are hidden for people who wants to deploy their page or create their own data repo and then they need to modify this html file as well to look for the interfacing point).
 
-## A fun metaphor of this whole thing (app/data/encryotion/etc) I thought of and might help you understand intuitively:
+## A fun metaphor of this whole thing (app/data/encryption/etc) I thought of and might help you understand intuitively:
 1. Github is like a hotpot restaurant that has lots of tables with lots of hotpot machines
 2. I am one of their customers who currently sits at and rents/uses one of thier hotpot matchine (=my github account)
 3. I use the hotpot machine (=my github account) to make some tasty hotpot soup (=this web app I design and make)
