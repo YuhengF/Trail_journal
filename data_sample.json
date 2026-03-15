@@ -1,228 +1,96 @@
 [
   {
-    "id": "mmqix50adfo3s",
-    "name": "Mission Peak via Ohlone College",
+    "id": "sample_sibley_volcanic",
+    "name": "Round Top Loop — Sibley Volcanic Preserve",
     "date": "2025-11-15",
     "status": "completed",
-    "distance": "5.8",
-    "elevation": "2100",
-    "duration": "3h 15m",
-    "difficulty": "hard",
-    "rating": 4,
-    "tags": [
-      "bay-area",
-      "peak",
-      "out-and-back",
-      "views"
-    ],
-    "weather": "Clear, 58°F, windy at summit",
-    "companions": "with Alex",
-    "notes": "The final push to the summit pole was brutal but the 360° view was worth it. Could see SF, the bay bridges, and all the way to the Sierra on a clear day.",
-    "photos": [],
-    "coords": [
-      [
-        37.5073,
-        -121.8816
-      ],
-      [
-        37.5065,
-        -121.8798
-      ],
-      [
-        37.5048,
-        -121.8775
-      ],
-      [
-        37.5035,
-        -121.8752
-      ],
-      [
-        37.5019,
-        -121.8731
-      ],
-      [
-        37.4997,
-        -121.8708
-      ],
-      [
-        37.4978,
-        -121.8683
-      ],
-      [
-        37.4963,
-        -121.8656
-      ],
-      [
-        37.4951,
-        -121.8627
-      ],
-      [
-        37.4942,
-        -121.8594
-      ],
-      [
-        37.4938,
-        -121.8559
-      ],
-      [
-        37.4941,
-        -121.8523
-      ],
-      [
-        37.4948,
-        -121.8487
-      ],
-      [
-        37.4959,
-        -121.8453
-      ],
-      [
-        37.4972,
-        -121.8424
-      ]
-    ]
-  },
-  {
-    "id": "mmqix50a5kr71",
-    "name": "Tilden Park: Wildcat Peak",
-    "date": "2025-12-01",
-    "status": "completed",
-    "distance": "3.2",
-    "elevation": "780",
-    "duration": "1h 45m",
+    "distance": "1.6",
+    "elevation": "310",
+    "duration": "1h 15m",
     "difficulty": "moderate",
-    "rating": 5,
-    "tags": [
-      "bay-area",
-      "loop",
-      "berkeley-hills",
-      "wildflowers"
-    ],
-    "weather": "Overcast, 52°F, light drizzle",
-    "companions": "solo",
-    "notes": "Perfect quick escape from campus. The eucalyptus grove smells incredible after rain. Spotted a red-tailed hawk circling above the peak.",
+    "rating": 4,
+    "tags": ["loop", "volcanic", "views", "wildflowers", "east-bay"],
+    "weather": "Partly cloudy, 62°F",
+    "companions": "Solo",
+    "notes": "Beautiful morning hike through the volcanic formations at Sibley. The quarry pit is fascinating — you can clearly see the layered basalt from ancient lava flows. Great views of the Bay from the upper ridge. Spotted lupine and California poppies on the south-facing slopes. The interpretive signs along the trail explain the 10-million-year-old volcanic history. A perfect short loop when you want geology and wildflowers without a huge time commitment.",
     "photos": [],
     "coords": [
-      [
-        37.9052,
-        -122.2446
-      ],
-      [
-        37.9061,
-        -122.2431
-      ],
-      [
-        37.9074,
-        -122.2412
-      ],
-      [
-        37.9088,
-        -122.2397
-      ],
-      [
-        37.9098,
-        -122.2378
-      ],
-      [
-        37.9112,
-        -122.2361
-      ],
-      [
-        37.9125,
-        -122.2348
-      ],
-      [
-        37.9139,
-        -122.2336
-      ],
-      [
-        37.9148,
-        -122.2318
-      ],
-      [
-        37.9157,
-        -122.2301
-      ],
-      [
-        37.9162,
-        -122.2283
-      ]
-    ]
+      [37.84790, -122.19770],
+      [37.84830, -122.19710],
+      [37.84860, -122.19650],
+      [37.84900, -122.19590],
+      [37.84940, -122.19540],
+      [37.84980, -122.19490],
+      [37.85020, -122.19460],
+      [37.85070, -122.19430],
+      [37.85110, -122.19400],
+      [37.85150, -122.19380],
+      [37.85180, -122.19370],
+      [37.85200, -122.19380],
+      [37.85220, -122.19410],
+      [37.85230, -122.19450],
+      [37.85230, -122.19500],
+      [37.85220, -122.19550],
+      [37.85190, -122.19610],
+      [37.85150, -122.19660],
+      [37.85100, -122.19710],
+      [37.85050, -122.19760],
+      [37.85000, -122.19790],
+      [37.84950, -122.19800],
+      [37.84900, -122.19790],
+      [37.84860, -122.19780],
+      [37.84830, -122.19770],
+      [37.84790, -122.19770]
+    ],
+    "speedData": null,
+    "gpxElevations": [430, 435, 443, 455, 468, 480, 493, 505, 515, 524, 532, 537, 534, 528, 520, 510, 498, 483, 470, 458, 448, 442, 437, 434, 432, 430],
+    "gpxTimes": null,
+    "timeRange": "10:30 AM – 11:45 AM",
+    "updatedAt": 1731700800000,
+    "_sample": true
   },
   {
-    "id": "mmqix50aq8sla",
-    "name": "Point Reyes: Tomales Point Trail",
+    "id": "sample_hand_drawn",
+    "name": "Hand-Drawn Wildcat Gorge Plan",
     "date": "",
     "status": "wishlist",
-    "distance": "9.4",
-    "elevation": "900",
+    "distance": "2.3",
+    "elevation": "",
     "duration": "",
-    "difficulty": "moderate",
+    "difficulty": "hard",
     "rating": 0,
-    "tags": [
-      "marin",
-      "coastal",
-      "out-and-back",
-      "elk",
-      "wildflowers"
-    ],
+    "tags": ["planned", "gorge", "creek", "tilden"],
     "weather": "",
     "companions": "",
-    "notes": "Heard this is amazing in spring with wildflowers + tule elk. Need to time it for a clear day.",
+    "notes": "Rough route sketched on the map — want to explore the Wildcat Gorge trail connecting Tilden down to the creek. Need to check seasonal access and whether the lower section is passable after rain.",
     "photos": [],
     "coords": [
-      [
-        38.1182,
-        -122.9553
-      ],
-      [
-        38.1215,
-        -122.9571
-      ],
-      [
-        38.1249,
-        -122.9598
-      ],
-      [
-        38.1281,
-        -122.9622
-      ],
-      [
-        38.1318,
-        -122.9641
-      ],
-      [
-        38.1357,
-        -122.9663
-      ],
-      [
-        38.1392,
-        -122.9678
-      ],
-      [
-        38.1431,
-        -122.9701
-      ],
-      [
-        38.1468,
-        -122.9717
-      ],
-      [
-        38.1503,
-        -122.9738
-      ],
-      [
-        38.1541,
-        -122.9751
-      ],
-      [
-        38.1578,
-        -122.9769
-      ],
-      [
-        38.1612,
-        -122.9789
-      ]
-    ]
+      [37.90200, -122.25200],
+      [37.90280, -122.25080],
+      [37.90400, -122.24880],
+      [37.90350, -122.24800],
+      [37.90480, -122.24620],
+      [37.90580, -122.24660],
+      [37.90680, -122.24450],
+      [37.90620, -122.24320],
+      [37.90750, -122.24150],
+      [37.90880, -122.24250],
+      [37.90980, -122.24050],
+      [37.90920, -122.23850],
+      [37.91080, -122.23680],
+      [37.91180, -122.23800],
+      [37.91320, -122.23580],
+      [37.91280, -122.23400],
+      [37.91420, -122.23220],
+      [37.91550, -122.23350],
+      [37.91680, -122.23100],
+      [37.91800, -122.22950]
+    ],
+    "speedData": null,
+    "gpxElevations": null,
+    "gpxTimes": null,
+    "timeRange": null,
+    "updatedAt": 1731614400000,
+    "_sample": true
   }
 ]

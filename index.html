@@ -1706,6 +1706,7 @@ function compressElevations(elevs, coords) {
 
 function compressTrailForStorage(t) {
   const out = { ...t };
+  delete out._sample;
   if (out.gpxTimes && Array.isArray(out.gpxTimes)) out.gpxTimes = compressGpxTimes(out.gpxTimes);
   if (out.coords) out.coords = out.coords.map(c => [Math.round(c[0]*1e6)/1e6, Math.round(c[1]*1e6)/1e6]);
   if (out.gpxElevations) out.gpxElevations = compressElevations(out.gpxElevations, out.coords);
@@ -1723,7 +1724,8 @@ function loadTrails() {
 }
 
 function saveLocal() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(trails.map(compressTrailForStorage)));
+  const realTrails = trails.filter(t => !t._sample);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(realTrails.map(compressTrailForStorage)));
 }
 function genId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
 function getTrailColor(i) { return TRAIL_COLORS[i % TRAIL_COLORS.length]; }
@@ -2080,11 +2082,12 @@ function saveSyncConfig() {
     return;
   }
   localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify(cfg));
+  trails = trails.filter(t => !t._sample);
   closeSettings();
   hideTokenBanner();
   tokenBannerDismissed = false;
   updateSyncStatus('synced', 'Connected to GitHub');
-  // Push current local data to GitHub
+  renderList(); renderMap();
   syncToGitHub();
 }
 
@@ -2252,7 +2255,7 @@ async function syncFromGitHub() {
 
       // Merge trails: combine both sets, then remove anything with a tombstone
       const localById = {};
-      trails.forEach(t => { localById[t.id] = t; });
+      trails.filter(t => !t._sample).forEach(t => { localById[t.id] = t; });
       const remoteById = {};
       remoteTrails.forEach(t => { remoteById[t.id] = t; });
 
@@ -2311,7 +2314,7 @@ async function syncToGitHub() {
   updateSyncStatus('pending', 'Pushing to GitHub...');
 
   try {
-    const payload = { trails: trails.map(compressTrailForStorage), tombstones: getTombstones() };
+    const payload = { trails: trails.filter(t => !t._sample).map(compressTrailForStorage), tombstones: getTombstones() };
     const content = btoa(unescape(encodeURIComponent(JSON.stringify(payload, null, 2))));
     const body = {
       message: `Update trails — ${new Date().toISOString().split('T')[0]}`,
@@ -4319,6 +4322,19 @@ map.on('click', (e) => {
 renderList(); renderMap();
 fetchTrailConditions(false);
 map.on('moveend', onMapMoveConditions);
+
+// Load sample trails for first-time users (no saved data AND no sync config)
+if (localStorage.getItem(STORAGE_KEY) === null && !getSyncConfig()) {
+  fetch('data_sample.json')
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(data => {
+      if (trails.length === 0 && localStorage.getItem(STORAGE_KEY) === null && !getSyncConfig()) {
+        trails = data.map(t => ({ ...t, _sample: true }));
+        renderList(); renderMap();
+      }
+    })
+    .catch(() => {});
+}
 
 // Tag input → update modal tag picker chips in real time
 document.getElementById('fTags').addEventListener('input', renderModalTagPicker);
