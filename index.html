@@ -1029,6 +1029,44 @@ img.leaflet-tile { image-rendering: auto; }
 }
 
 /* ===== TAG FILTER SYSTEM ===== */
+.sort-row {
+  display: flex; align-items: center; gap: 6px;
+  position: relative;
+}
+.sort-btn {
+  font-size: 11px; padding: 4px 10px; border-radius: 20px;
+  border: 1px solid var(--border); background: none;
+  color: var(--text-dim); cursor: pointer; font-family: inherit;
+  transition: all 0.15s; display: flex; align-items: center; gap: 4px;
+  white-space: nowrap;
+}
+.sort-btn:hover { border-color: var(--text-muted); background: var(--bg-hover); }
+.sort-btn.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 500; }
+.sort-btn .sort-arrow { font-size: 9px; opacity: 0.7; }
+
+.sort-dropdown {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 200;
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-lg);
+  min-width: 180px; padding: 4px 0;
+  opacity: 0; pointer-events: none; transform: translateY(-4px);
+  transition: opacity 0.15s, transform 0.15s;
+}
+.sort-dropdown.open { opacity: 1; pointer-events: auto; transform: translateY(0); }
+
+.sort-option {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 7px 14px; border: none; background: none;
+  font-size: 12px; font-family: inherit; color: var(--text-dim);
+  cursor: pointer; text-align: left; transition: background 0.1s;
+}
+.sort-option:hover { background: var(--bg-hover); }
+.sort-option.selected { color: var(--accent); font-weight: 500; }
+.sort-option .sort-opt-icon { width: 16px; text-align: center; font-size: 11px; }
+.sort-option .sort-opt-dir { margin-left: auto; font-size: 10px; opacity: 0.5; }
+
+.sort-divider { height: 1px; background: var(--border); margin: 4px 0; }
+
 .tag-filter-row {
   display: flex; align-items: center; gap: 6px;
   flex-wrap: wrap;
@@ -1158,6 +1196,9 @@ img.leaflet-tile { image-rendering: auto; }
 .trail-tag.clickable:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 
 @media (max-width: 800px) {
+  .sort-btn { font-size: 12px; padding: 6px 11px; }
+  .sort-dropdown { min-width: 200px; }
+  .sort-option { padding: 9px 14px; font-size: 13px; }
   .tag-filter-row { gap: 4px; }
   .tag-filter-btn { font-size: 12px; padding: 6px 11px; }
   .top-tag-chip { font-size: 11px; padding: 5px 10px; }
@@ -1262,6 +1303,36 @@ img.leaflet-tile { image-rendering: auto; }
         <button class="chip" data-filter="completed">✓ Completed</button>
         <button class="chip" data-filter="wishlist">★ Wishlist</button>
         <button class="chip" data-filter="5star">5★ Only</button>
+      </div>
+      <div class="sort-row" id="sortRow">
+        <button class="sort-btn" id="sortBtn" onclick="toggleSortDropdown(event)">
+          <span class="sort-arrow">⇅</span> <span id="sortLabel">Date ↓</span>
+        </button>
+        <div class="sort-dropdown" id="sortDropdown">
+          <button class="sort-option selected" data-sort="date-desc" onclick="setSort('date-desc')"><span class="sort-opt-icon">📅</span> Date<span class="sort-opt-dir">newest first</span></button>
+          <button class="sort-option" data-sort="date-asc" onclick="setSort('date-asc')"><span class="sort-opt-icon">📅</span> Date<span class="sort-opt-dir">oldest first</span></button>
+          <div class="sort-divider"></div>
+          <button class="sort-option" data-sort="added-desc" onclick="setSort('added-desc')"><span class="sort-opt-icon">🕐</span> Added<span class="sort-opt-dir">newest first</span></button>
+          <button class="sort-option" data-sort="added-asc" onclick="setSort('added-asc')"><span class="sort-opt-icon">🕐</span> Added<span class="sort-opt-dir">oldest first</span></button>
+          <div class="sort-divider"></div>
+          <button class="sort-option" data-sort="name-asc" onclick="setSort('name-asc')"><span class="sort-opt-icon">Aa</span> Name<span class="sort-opt-dir">A → Z</span></button>
+          <button class="sort-option" data-sort="name-desc" onclick="setSort('name-desc')"><span class="sort-opt-icon">Aa</span> Name<span class="sort-opt-dir">Z → A</span></button>
+          <div class="sort-divider"></div>
+          <button class="sort-option" data-sort="distance-desc" onclick="setSort('distance-desc')"><span class="sort-opt-icon">↔</span> Distance<span class="sort-opt-dir">longest first</span></button>
+          <button class="sort-option" data-sort="distance-asc" onclick="setSort('distance-asc')"><span class="sort-opt-icon">↔</span> Distance<span class="sort-opt-dir">shortest first</span></button>
+          <div class="sort-divider"></div>
+          <button class="sort-option" data-sort="duration-desc" onclick="setSort('duration-desc')"><span class="sort-opt-icon">⏱</span> Duration<span class="sort-opt-dir">longest first</span></button>
+          <button class="sort-option" data-sort="duration-asc" onclick="setSort('duration-asc')"><span class="sort-opt-icon">⏱</span> Duration<span class="sort-opt-dir">shortest first</span></button>
+          <div class="sort-divider"></div>
+          <button class="sort-option" data-sort="elevation-desc" onclick="setSort('elevation-desc')"><span class="sort-opt-icon">▲</span> Elevation<span class="sort-opt-dir">most first</span></button>
+          <button class="sort-option" data-sort="elevation-asc" onclick="setSort('elevation-asc')"><span class="sort-opt-icon">▲</span> Elevation<span class="sort-opt-dir">least first</span></button>
+          <div class="sort-divider"></div>
+          <button class="sort-option" data-sort="rating-desc" onclick="setSort('rating-desc')"><span class="sort-opt-icon">★</span> Rating<span class="sort-opt-dir">highest first</span></button>
+          <button class="sort-option" data-sort="rating-asc" onclick="setSort('rating-asc')"><span class="sort-opt-icon">★</span> Rating<span class="sort-opt-dir">lowest first</span></button>
+          <div class="sort-divider"></div>
+          <button class="sort-option" data-sort="start-desc" onclick="setSort('start-desc')"><span class="sort-opt-icon">🌄</span> Start Time<span class="sort-opt-dir">latest first</span></button>
+          <button class="sort-option" data-sort="start-asc" onclick="setSort('start-asc')"><span class="sort-opt-icon">🌄</span> Start Time<span class="sort-opt-dir">earliest first</span></button>
+        </div>
       </div>
       <div class="tag-filter-row" id="tagFilterRow"></div>
     </div>
@@ -1546,6 +1617,7 @@ let trailsVisible = true, focusedTrailId = null, savedMapView = null;
 let syncPending = false;
 let ghSha = null;
 let activeTagFilters = [];
+let currentSort = 'date-desc';
 
 const TRAIL_COLORS = [
   '#e8552e','#2eaa55','#2e88dd','#b044dd','#dd9922',
@@ -3261,11 +3333,94 @@ function applyTrim() {
   openDetail(t.id);
 }
 
+// ===== SORTING =====
+const SORT_LABELS = {
+  'date-desc': 'Date ↓', 'date-asc': 'Date ↑',
+  'added-desc': 'Added ↓', 'added-asc': 'Added ↑',
+  'name-asc': 'Name A→Z', 'name-desc': 'Name Z→A',
+  'distance-desc': 'Distance ↓', 'distance-asc': 'Distance ↑',
+  'duration-desc': 'Duration ↓', 'duration-asc': 'Duration ↑',
+  'elevation-desc': 'Elevation ↓', 'elevation-asc': 'Elevation ↑',
+  'rating-desc': 'Rating ↓', 'rating-asc': 'Rating ↑',
+  'start-desc': 'Start ↓', 'start-asc': 'Start ↑',
+};
+
+function getFirstGpxTime(trail) {
+  if (!trail.gpxTimes) return null;
+  if (Array.isArray(trail.gpxTimes)) return trail.gpxTimes[0] || null;
+  if (trail.gpxTimes.base != null) return trail.gpxTimes.base;
+  return null;
+}
+
+function applySortToTrails(arr) {
+  const [field, dir] = currentSort.split('-');
+  const m = dir === 'asc' ? 1 : -1;
+
+  arr.sort((a, b) => {
+    if (a.status !== b.status) return a.status === 'completed' ? -1 : 1;
+
+    let cmp = 0;
+    switch (field) {
+      case 'date':
+        cmp = (a.date || '').localeCompare(b.date || '');
+        break;
+      case 'added':
+        cmp = (a.updatedAt || 0) - (b.updatedAt || 0);
+        break;
+      case 'name':
+        cmp = (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
+        break;
+      case 'distance':
+        cmp = (parseFloat(a.distance) || 0) - (parseFloat(b.distance) || 0);
+        break;
+      case 'duration':
+        cmp = parseDurationToMinutes(a.duration) - parseDurationToMinutes(b.duration);
+        break;
+      case 'elevation':
+        cmp = (parseInt(a.elevation) || 0) - (parseInt(b.elevation) || 0);
+        break;
+      case 'rating':
+        cmp = (a.rating || 0) - (b.rating || 0);
+        break;
+      case 'start':
+        cmp = (getFirstGpxTime(a) || 0) - (getFirstGpxTime(b) || 0);
+        break;
+    }
+    return cmp * m;
+  });
+}
+
+function toggleSortDropdown(e) {
+  e.stopPropagation();
+  const dd = document.getElementById('sortDropdown');
+  dd.classList.toggle('open');
+  if (dd.classList.contains('open')) {
+    setTimeout(() => document.addEventListener('click', closeSortDropdown, { once: true }), 0);
+  }
+}
+
+function closeSortDropdown() {
+  document.getElementById('sortDropdown').classList.remove('open');
+}
+
+function setSort(key) {
+  currentSort = key;
+  document.getElementById('sortLabel').textContent = SORT_LABELS[key] || key;
+  const btn = document.getElementById('sortBtn');
+  btn.classList.toggle('active', key !== 'date-desc');
+  document.querySelectorAll('.sort-option').forEach(opt => {
+    opt.classList.toggle('selected', opt.dataset.sort === key);
+  });
+  closeSortDropdown();
+  renderList();
+  renderMap();
+}
+
 // ===== TRAIL LIST =====
 function renderList() {
   const list = document.getElementById('trailList');
   let filtered = getFilteredTrails();
-  filtered.sort((a,b) => { if (a.status !== b.status) return a.status==='completed'?-1:1; if (a.date&&b.date) return b.date.localeCompare(a.date); return 0; });
+  applySortToTrails(filtered);
   list.innerHTML = filtered.length === 0
     ? `<div style="text-align:center;padding:40px 20px;color:var(--text-muted);font-size:13px;line-height:1.6;">${trails.length===0?'No trails yet.<br><br>Tap <strong style="color:var(--accent)">+ Add Trail</strong> to log your first hike,<br>or set up <strong>⚙ Sync</strong> to pull data from another device.':'No matches found.'}</div>`
     : filtered.map(t => {
