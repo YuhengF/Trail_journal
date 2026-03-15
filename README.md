@@ -8,7 +8,7 @@ I used claude to write this app to track my personal hiking record. I tried to i
 
 ### if you want to do everything yourself:
 
-1. Fork the repo
+1. Fork the repo;
 2. Make sure it's set to public so you can enable **Page** function on github;
 3. Create your own private data managing repo (say "my_data") on your own github, and then enable a fine-grained token to access this data;
 4. In the first time setup of the app, access the page hosting this trail journal html (would be something like https://yuhengf.github.io/Trail_journal/ but under your own github), then click **sync** button. Fill in the token etc info to access your private data;
