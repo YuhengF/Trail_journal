@@ -9,7 +9,7 @@ I used claude to write this app to track my personal hiking record. I tried to i
 3. To create new trails you can either draw on the map (this is an exciting tiny functionality I like about my app), or you need .GPX files (.GPX is a GPS data format). One way to obtain .GPX is to export apple watch health data (you can easily find your workout routes in .GPX format in the exported zip).
 
 
-### if you want to do everything yourself:
+### If you want to do everything yourself:
 
 1. Fork the repo;
 2. Make sure it's set to public so you can enable **Page** function on github;
