@@ -1131,7 +1131,7 @@ img.leaflet-tile { image-rendering: auto; }
 
   <div class="map-controls" id="mapControls">
     <button class="active" data-layer="streets">Faded</button>
-    <button data-layer="muted">Grayscale</button>
+    <button data-layer="terrain">Terrain</button>
     <button data-layer="dark">Dark</button>
     <span style="width:1px;background:var(--border);margin:4px 2px;"></span>
     <button class="active" id="trailToggle" onclick="toggleTrailVisibility()">Trails</button>
@@ -2087,7 +2087,11 @@ function initMap() {
   const tileOpts = { attribution: attr, maxZoom: 19, subdomains: 'abcd' };
 
   tileLayers.streets = L.tileLayer(baseUrl, tileOpts);
-  tileLayers.muted = L.tileLayer(baseUrl, tileOpts);
+  tileLayers.terrain = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap &amp; OpenTopoMap',
+    maxZoom: 17,
+    subdomains: 'abc'
+  });
   tileLayers.dark = L.tileLayer(baseUrl, tileOpts);
   tileLayers.streets.addTo(map);
   currentTileLayer = 'streets';
@@ -2104,7 +2108,7 @@ function switchTileLayer(name) {
   document.querySelectorAll('.map-controls button[data-layer]').forEach(b => b.classList.toggle('active', b.dataset.layer === name));
   const tp = document.querySelector('.leaflet-tile-pane');
   if (name === 'streets') tp.style.filter = 'saturate(0.3) brightness(1.05) contrast(0.9)';
-  else if (name === 'muted') tp.style.filter = 'saturate(0) brightness(1.1) contrast(0.85)';
+  else if (name === 'terrain') tp.style.filter = 'none';
   else if (name === 'dark') tp.style.filter = 'saturate(0.2) brightness(0.55) contrast(1.1) invert(1) hue-rotate(180deg)';
 }
 
