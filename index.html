@@ -2359,6 +2359,7 @@ async function syncToGitHub() {
 // Debounced sync — waits 2s after last change before pushing
 let syncTimer = null;
 function saveData() {
+  trails.forEach(t => delete t._sample);
   saveLocal();
   const cfg = getSyncConfig();
   if (cfg) {
