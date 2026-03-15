@@ -35,7 +35,7 @@ Just so I don't need any server or datasync services other than github. There're
 12. However other people who drop by can bring their own magic food box (=their own private github data repository) and put their meat balls cooked in my soup in their own box (and as mentioned before, they are welcome to just grab some of my soup to their own hotpot machine without using mine!), so that neither I or you can access those meat balls
 14. In some cases you might think "I don't want other magic food box granted users to also touch my meat balls!" so you ask me and I encourage you to put a lock (=data encryption) on the magic food box. Then even I cannot open up the box. On the other hand if you forget your key to the lock (=foret the passphrase when you establish the encryption) you will never be able to take out and appreciate your tasty meat balls! I wish but I cannot do that for you!
 
-(You're welcome to think of the metaphors of other more advanced operations, for example if I store your data directly in a public json file together with the Page session? Or if someone wants to use other cloud services or data servers?)
+(You're welcome to think of the metaphors of other more advanced operations, for example if I techinically/procedurally store your data directly in a public json file together with the Page session? Or if someone wants to use other cloud services or data servers?)
 
 ## Notes for myself or users who want to know how I store their data under my github account:
 
