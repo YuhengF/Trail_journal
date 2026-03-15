@@ -1111,6 +1111,36 @@ img.leaflet-tile { image-rendering: auto; }
 @media (max-width: 800px) {
   .trail-conditions { padding: 6px 14px; font-size: 11px; }
 }
+
+/* ELEVATION PROFILE */
+.elev-profile {
+  position: fixed; bottom: 24px; right: 24px; z-index: 1400;
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-lg);
+  padding: 10px 14px 8px; width: 280px;
+  opacity: 0; transform: translateY(12px);
+  transition: opacity 0.2s ease, transform 0.2s ease, right 0.25s ease;
+  pointer-events: none;
+}
+.elev-profile.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.elev-profile-title {
+  font-size: 10px; color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: 0.8px; margin-bottom: 6px;
+}
+.elev-profile canvas { display: block; width: 100%; height: 100px; border-radius: 4px; }
+.elev-profile-axis {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 4px;
+}
+.elev-profile-axis span {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px; color: var(--text-muted);
+}
+.elev-profile.with-detail { right: 424px; }
+@media (max-width: 800px) {
+  .elev-profile { bottom: 70px; right: 10px; left: 10px; width: auto; }
+  .elev-profile.with-detail { right: 10px; }
+}
 </style>
 </head>
 <body>
@@ -1222,6 +1252,17 @@ img.leaflet-tile { image-rendering: auto; }
 
 <!-- PHOTO LIGHTBOX -->
 <div class="photo-lightbox" id="photoLightbox" onclick="closeLightbox()"><img src=""></div>
+
+<!-- ELEVATION PROFILE -->
+<div class="elev-profile" id="elevProfile">
+  <div class="elev-profile-title">Elevation Profile</div>
+  <canvas id="elevCanvas" width="504" height="200"></canvas>
+  <div class="elev-profile-axis">
+    <span id="elevMinAlt"></span>
+    <span id="elevDistLabel"></span>
+    <span id="elevMaxAlt"></span>
+  </div>
+</div>
 
 <!-- DETAIL PANEL -->
 <div class="detail-panel" id="detailPanel">
@@ -1421,7 +1462,7 @@ const STORAGE_KEY = 'trail_journal_data';
 const SYNC_CONFIG_KEY = 'trail_journal_sync';
 const TOMBSTONE_KEY = 'trail_journal_tombstones';
 let trails = [];
-let editingId = null, selectedId = null, currentRating = 0, gpxTrackData = null, gpxSpeedData = null, gpxTimesData = null;
+let editingId = null, selectedId = null, currentRating = 0, gpxTrackData = null, gpxSpeedData = null, gpxTimesData = null, gpxElevData = null;
 let trailsVisible = true, focusedTrailId = null, savedMapView = null;
 let syncPending = false;
 let ghSha = null;
@@ -1574,10 +1615,21 @@ function decompressGpxTimes(data) {
   return null;
 }
 
+function compressElevations(elevs, coords) {
+  if (!elevs || !elevs.length) return null;
+  const MAX_PTS = 200;
+  if (elevs.length <= MAX_PTS) return elevs.map(e => Math.round(e));
+  const step = (elevs.length - 1) / (MAX_PTS - 1);
+  const out = [];
+  for (let i = 0; i < MAX_PTS; i++) out.push(Math.round(elevs[Math.round(i * step)]));
+  return out;
+}
+
 function compressTrailForStorage(t) {
   const out = { ...t };
   if (out.gpxTimes && Array.isArray(out.gpxTimes)) out.gpxTimes = compressGpxTimes(out.gpxTimes);
   if (out.coords) out.coords = out.coords.map(c => [Math.round(c[0]*1e6)/1e6, Math.round(c[1]*1e6)/1e6]);
+  if (out.gpxElevations) out.gpxElevations = compressElevations(out.gpxElevations, out.coords);
   return out;
 }
 
@@ -2528,10 +2580,80 @@ function focusTrail(id) {
       l.outline.setStyle({ opacity: f ? 0.55 : 0.05 });
     });
   }
+  const t = trails.find(x => x.id === id);
+  if (t) showElevationProfile(t);
 }
 
 function resetMapHighlight() {
   Object.values(trailLayers).forEach(l => { l.lines.forEach(x => x.setStyle({ opacity: 0.92, weight: 5 })); l.outline.setStyle({ opacity: 0.45 }); });
+  hideElevationProfile();
+}
+
+function showElevationProfile(trail) {
+  const el = document.getElementById('elevProfile');
+  const canvas = document.getElementById('elevCanvas');
+  if (!el || !canvas) return;
+  const elevs = trail.gpxElevations;
+  const coords = trail.coords;
+  if (!elevs || !elevs.length || !coords || coords.length < 2) { hideElevationProfile(); return; }
+
+  const n = elevs.length;
+  let cumDist = [0];
+  if (n === coords.length) {
+    for (let i = 1; i < n; i++) cumDist.push(cumDist[i-1] + haversine(coords[i-1], coords[i]));
+  } else {
+    const step = (coords.length - 1) / (n - 1);
+    for (let i = 1; i < n; i++) {
+      const ci = Math.round(i * step), pi = Math.round((i-1) * step);
+      cumDist.push(cumDist[i-1] + haversine(coords[pi], coords[ci]));
+    }
+  }
+  const totalDistMi = cumDist[n-1] * 0.621371;
+  const elevsFt = elevs.map(e => e * 3.28084);
+  const minE = Math.min(...elevsFt), maxE = Math.max(...elevsFt);
+  const range = maxE - minE || 1;
+
+  document.getElementById('elevMinAlt').textContent = Math.round(minE).toLocaleString() + ' ft';
+  document.getElementById('elevMaxAlt').textContent = Math.round(maxE).toLocaleString() + ' ft';
+  document.getElementById('elevDistLabel').textContent = totalDistMi.toFixed(1) + ' mi';
+
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const pad = { top: 6, bottom: 4, left: 2, right: 2 };
+  const pw = W - pad.left - pad.right, ph = H - pad.top - pad.bottom;
+  ctx.clearRect(0, 0, W, H);
+
+  const totalDist = cumDist[n-1] || 1;
+  const toX = i => pad.left + (cumDist[i] / totalDist) * pw;
+  const toY = i => pad.top + ph - ((elevsFt[i] - minE) / range) * ph;
+
+  const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + ph);
+  grad.addColorStop(0, 'rgba(199, 98, 58, 0.35)');
+  grad.addColorStop(1, 'rgba(199, 98, 58, 0.05)');
+
+  ctx.beginPath();
+  ctx.moveTo(toX(0), pad.top + ph);
+  for (let i = 0; i < n; i++) ctx.lineTo(toX(i), toY(i));
+  ctx.lineTo(toX(n-1), pad.top + ph);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(toX(0), toY(0));
+  for (let i = 1; i < n; i++) ctx.lineTo(toX(i), toY(i));
+  ctx.strokeStyle = '#c7623a';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  const detailOpen = document.getElementById('detailPanel').classList.contains('open');
+  el.classList.toggle('with-detail', detailOpen);
+  el.classList.add('visible');
+}
+
+function hideElevationProfile() {
+  const el = document.getElementById('elevProfile');
+  if (el) el.classList.remove('visible');
 }
 
 function isTrailProminentInView(trailId) {
@@ -2655,7 +2777,7 @@ function parseGPX(xmlStr) {
     if (durationMs > 0) duration = formatDuration(durationMs);
     timeRange = formatTimeRange(validTimestamps[0], validTimestamps[validTimestamps.length - 1]);
   }
-  return { coords, distance: (dist*0.621371).toFixed(1), elevation: Math.round(gain*3.28084), name: nameEl ? nameEl.textContent : '', speedData, times, duration, startDate, timeRange };
+  return { coords, elevations, distance: (dist*0.621371).toFixed(1), elevation: Math.round(gain*3.28084), name: nameEl ? nameEl.textContent : '', speedData, times, duration, startDate, timeRange };
 }
 
 function haversine([lat1,lon1],[lat2,lon2]) {
@@ -2897,6 +3019,7 @@ function applyTrim() {
   if (trimmed.length < 2) return;
   t.coords = trimmed;
   t.speedData = null;
+  t.gpxElevations = null;
   t.distance = distanceFromCoords(trimmed);
   if (t.gpxTimes) {
     t.gpxTimes = t.gpxTimes.slice(start - 1, end);
@@ -2974,7 +3097,7 @@ document.querySelectorAll('.map-controls button[data-layer]').forEach(btn => {
 
 // ===== MODAL =====
 function openAddModal() {
-  editingId = null; gpxTrackData = null; gpxSpeedData = null; gpxTimesData = null;
+  editingId = null; gpxTrackData = null; gpxSpeedData = null; gpxTimesData = null; gpxElevData = null;
   document.getElementById('modalTitle').textContent = 'Add Trail';
   document.getElementById('saveBtn').textContent = 'Save Trail';
   clearForm();
@@ -2988,7 +3111,7 @@ function openAddModal() {
 
 function openEditModal(id) {
   const t = trails.find(x => x.id===id); if (!t) return;
-  editingId = id; gpxTrackData = t.coords || null; gpxSpeedData = t.speedData || null; gpxTimesData = t.gpxTimes || null;
+  editingId = id; gpxTrackData = t.coords || null; gpxSpeedData = t.speedData || null; gpxTimesData = t.gpxTimes || null; gpxElevData = t.gpxElevations || null;
   document.getElementById('modalTitle').textContent = 'Edit Trail';
   document.getElementById('saveBtn').textContent = 'Update Trail';
   document.getElementById('fName').value = t.name||'';
@@ -3051,6 +3174,7 @@ async function saveTrail() {
     photos: photoIds,
     coords,
     speedData: gpxSpeedData || (editingId ? (trails.find(x => x.id === editingId)?.speedData || null) : null),
+    gpxElevations: gpxElevData || (editingId ? (trails.find(x => x.id === editingId)?.gpxElevations || null) : null),
     gpxTimes: timesArr,
     timeRange: timeRangeFromTimes(timesArr, 0, timesArr ? timesArr.length : 0),
     updatedAt: Date.now()
@@ -3107,6 +3231,7 @@ function handleGPXFile(file) {
       gpxTrackData = r.coords;
       gpxSpeedData = r.speedData || null;
       gpxTimesData = r.times || null;
+      gpxElevData = (r.elevations && r.elevations.length === r.coords.length) ? r.elevations : null;
 
       const trailName = r.name || fileName;
       gpxAutoFill('fName', trailName);
@@ -3166,7 +3291,7 @@ function startDrawMode() {
     notes: document.getElementById('fNotes').value,
     photos: [...formPhotos],
     coords: document.getElementById('fCoords').value,
-    gpxTrackData, gpxSpeedData, gpxTimesData
+    gpxTrackData, gpxSpeedData, gpxTimesData, gpxElevData
   };
 
   const existing = document.getElementById('fCoords').value.trim();
@@ -3280,6 +3405,7 @@ function restoreFormState() {
   gpxTrackData = s.gpxTrackData;
   gpxSpeedData = s.gpxSpeedData;
   gpxTimesData = s.gpxTimesData;
+  gpxElevData = s.gpxElevData;
   document.getElementById('modalTitle').textContent = editingId ? 'Edit Trail' : 'Add Trail';
   document.getElementById('saveBtn').textContent = editingId ? 'Update Trail' : 'Save Trail';
   renderModalTagPicker();
@@ -3295,6 +3421,7 @@ function finishDrawing() {
   gpxTrackData = coords;
   gpxSpeedData = null;
   gpxTimesData = null;
+  gpxElevData = null;
   gpxAutoFill('fDistance', dist, true);
   document.getElementById('gpxDrop').innerHTML = `<div style="color:var(--green)">✓ Drawn track — ${coords.length} points, ${dist} mi</div>`;
   document.getElementById('modalOverlay').classList.add('open');
