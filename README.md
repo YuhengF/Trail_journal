@@ -1,12 +1,12 @@
 I used claude to write this app to track my personal hiking record. I tried to include all functionalities I feel excited about (especially those not included by popular hiking apps, for example showing all past trails altogether on the map, which gives people sometimes sense of achievements as if they're wandering in their kindom of hiking realm). Bugs might exist, please feel free to leave a message for any comments of suggestions. 
 
-To use it on your own device, 
+## To use it on your own device, 
 
-If you dont want to manage all the data and program and deployment work:
+### If you dont want to manage all the data and program and deployment work:
 
 1. You can also use my existing github page session **https://yuhengf.github.io/Trail_journal/**, but then all data files will be saved locally on single device if you don't enable Sync. In order to sync your data, you need to contact me to create a private data repo for you under my github account;
 
-if you want to do everything yourself:
+### if you want to do everything yourself:
 
 1. Fork the repo
 2. Make sure it's set to public so you can enable **Page** function on github;
