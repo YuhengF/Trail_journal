@@ -302,6 +302,16 @@ body {
 
 .form-group .star-input span.filled { color: var(--accent); }
 
+.date-field-wrapper { position: relative; overflow: hidden; }
+.date-picker-ghost {
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  opacity: 0 !important;
+  z-index: 2;
+  cursor: pointer;
+}
+
 .modal-footer {
   padding: 0 24px 20px; display: flex; gap: 8px; justify-content: flex-end;
 }
@@ -1193,7 +1203,7 @@ img.leaflet-tile { image-rendering: auto; }
       </div>
       <div class="form-group"><label>Trail Name *</label><input type="text" id="fName" placeholder="e.g. Mission Peak Loop"></div>
       <div class="form-row">
-        <div class="form-group"><label>Date</label><input type="text" id="fDate" placeholder="YYYY-MM-DD" onfocus="this.type='date'" onblur="this.type='text'"></div>
+        <div class="form-group date-field-wrapper"><label>Date</label><input type="text" id="fDate" placeholder="YYYY-MM-DD" readonly><input type="date" id="fDatePicker" class="date-picker-ghost" onfocus="this.value=document.getElementById('fDate').value" onchange="document.getElementById('fDate').value=this.value"></div>
         <div class="form-group"><label>Status</label><select id="fStatus"><option value="completed">Completed</option><option value="wishlist">Wishlist</option></select></div>
       </div>
       <div class="form-row">
@@ -2613,7 +2623,7 @@ function openEditModal(id) {
   document.getElementById('modalTitle').textContent = 'Edit Trail';
   document.getElementById('saveBtn').textContent = 'Update Trail';
   document.getElementById('fName').value = t.name||'';
-  const fd2 = document.getElementById('fDate'); fd2.type='text'; fd2.value=t.date||'';
+  document.getElementById('fDate').value=t.date||'';
   document.getElementById('fStatus').value = t.status||'completed';
   document.getElementById('fDistance').value = t.distance||'';
   document.getElementById('fElevation').value = t.elevation||'';
@@ -2642,7 +2652,6 @@ function closeModal(e) {
 
 function clearForm() {
   ['fName','fDate','fDistance','fElevation','fDuration','fTags','fWeather','fCompanions','fNotes','fPhotos','fCoords'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('fDate').type = 'text';
   document.getElementById('fStatus').value = 'completed';
   document.getElementById('fDifficulty').value = '';
   setStars(0);
@@ -2773,7 +2782,6 @@ function startDrawMode() {
     editing: editingId,
     name: document.getElementById('fName').value,
     date: document.getElementById('fDate').value,
-    dateType: document.getElementById('fDate').type,
     status: document.getElementById('fStatus').value,
     distance: document.getElementById('fDistance').value,
     elevation: document.getElementById('fElevation').value,
@@ -2884,7 +2892,7 @@ function restoreFormState() {
   const s = drawSavedFormState;
   editingId = s.editing;
   document.getElementById('fName').value = s.name;
-  const fd = document.getElementById('fDate'); fd.type = 'text'; fd.value = s.date;
+  document.getElementById('fDate').value = s.date;
   document.getElementById('fStatus').value = s.status;
   document.getElementById('fDistance').value = s.distance;
   document.getElementById('fElevation').value = s.elevation;
