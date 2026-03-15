@@ -1202,12 +1202,12 @@ img.leaflet-tile { image-rendering: auto; }
 
   <!-- Mobile bottom tab bar -->
   <div class="mobile-tabs" id="mobileTabs">
-    <button class="mobile-tab" data-tab="list" onclick="switchMobileTab('list')">
+    <button class="mobile-tab" data-tab="list" onclick="toggleMobileTab('list')">
       <span class="mobile-tab-icon">☰</span>
       <span class="mobile-tab-label">Trails</span>
     </button>
     <button class="mobile-tab-add" onclick="openAddModal()">+</button>
-    <button class="mobile-tab active" data-tab="map" onclick="switchMobileTab('map')">
+    <button class="mobile-tab active" data-tab="map" onclick="toggleMobileTab('map')">
       <span class="mobile-tab-icon">🗺</span>
       <span class="mobile-tab-label">Map</span>
     </button>
@@ -3538,6 +3538,15 @@ document.addEventListener('touchstart', (e) => {
 }, { passive: true });
 
 // ===== MOBILE TAB NAVIGATION =====
+function toggleMobileTab(tab) {
+  const current = document.querySelector('.mobile-tab.active');
+  if (current && current.dataset.tab === tab) {
+    switchMobileTab(tab === 'list' ? 'map' : 'list');
+  } else {
+    switchMobileTab(tab);
+  }
+}
+
 function switchMobileTab(tab, resetView = true) {
   const sidebar = document.getElementById('sidebar');
   const tabs = document.querySelectorAll('.mobile-tab');
