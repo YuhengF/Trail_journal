@@ -251,6 +251,8 @@ body {
 }
 
 .modal-overlay.open { opacity: 1; pointer-events: auto; backdrop-filter: blur(4px); }
+.modal-overlay.gpx-preview { backdrop-filter: none; background: rgba(0,0,0,0.08); }
+.modal-overlay.gpx-preview .modal { box-shadow: 0 8px 40px rgba(0,0,0,0.22); }
 
 .modal {
   background: var(--bg-panel); border: 1px solid var(--border);
@@ -2547,6 +2549,7 @@ function toggleModalTag(tag) {
 
 // ===== MAP =====
 let map, trailLayers = {}, tileLayers = {}, currentTileLayer = null;
+let gpxPreviewLayers = [];
 
 function initMap() {
   map = L.map('map', { zoomControl: true }).setView([37.87, -122.27], 10);
@@ -2655,6 +2658,32 @@ function focusTrail(id) {
 function resetMapHighlight() {
   Object.values(trailLayers).forEach(l => { l.lines.forEach(x => x.setStyle({ opacity: 0.92, weight: 5 })); l.outline.setStyle({ opacity: 0.45 }); });
   hideElevationProfile();
+}
+
+function showGpxPreview(coords) {
+  clearGpxPreview();
+  if (!coords || coords.length < 2) return;
+  const outline = L.polyline(coords, { color: '#1a1a1e', weight: 9, opacity: 0.4, smoothFactor: 1, interactive: false });
+  const line = L.polyline(coords, { color: '#c7623a', weight: 5, opacity: 1, smoothFactor: 1, interactive: false });
+  outline.addTo(map);
+  line.addTo(map);
+  gpxPreviewLayers = [outline, line];
+  Object.values(trailLayers).forEach(l => {
+    l.lines.forEach(x => x.setStyle({ opacity: 0.15 }));
+    l.outline.setStyle({ opacity: 0.08 });
+  });
+  map.fitBounds(line.getBounds(), { padding: [60, 60], maxZoom: 15, animate: true });
+  document.getElementById('modalOverlay').classList.add('gpx-preview');
+}
+
+function clearGpxPreview() {
+  gpxPreviewLayers.forEach(l => map.removeLayer(l));
+  gpxPreviewLayers = [];
+  Object.values(trailLayers).forEach(l => {
+    l.lines.forEach(x => x.setStyle({ opacity: 0.92, weight: 5 }));
+    l.outline.setStyle({ opacity: 0.45 });
+  });
+  document.getElementById('modalOverlay').classList.remove('gpx-preview');
 }
 
 function smoothElevation(arr, radius) {
@@ -3271,6 +3300,7 @@ document.querySelectorAll('.map-controls button[data-layer]').forEach(btn => {
 function openAddModal() {
   editingId = null; gpxTrackData = null; gpxSpeedData = null; gpxTimesData = null; gpxElevData = null;
   batchQueue = []; batchCurrentIdx = -1;
+  clearGpxPreview();
   document.getElementById('batchQueue').innerHTML = '';
   document.getElementById('modalTitle').textContent = 'Add Trail';
   document.getElementById('saveBtn').textContent = 'Save Trail';
@@ -3320,6 +3350,7 @@ function closeModal(e) {
   if (e && e.target !== e.currentTarget) return;
   document.getElementById('modalOverlay').classList.remove('open');
   batchQueue = []; batchCurrentIdx = -1;
+  clearGpxPreview();
   if (window.innerWidth <= 800) switchMobileTab('list');
 }
 
@@ -3470,6 +3501,7 @@ function handleGPXFile(file) {
 
       const extras = [r.timeRange, r.duration, gpxSpeedData ? 'speed data' : ''].filter(Boolean).join(', ');
       document.getElementById('gpxDrop').innerHTML = `<div style="color:var(--green)">✓ GPX loaded — ${r.coords.length} points, ${r.distance} mi, ${r.elevation} ft gain${extras ? ', ' + extras : ''}</div>`;
+      showGpxPreview(r.coords);
     } catch(err) { document.getElementById('gpxDrop').innerHTML = `<div style="color:#c0392b">Error: ${err.message}</div>`; }
   };
   reader.readAsText(file);
@@ -3664,6 +3696,7 @@ function selectBatchItem(idx) {
   clearFormPhotos();
   renderBatchQueue();
   updateBatchSaveButton();
+  showGpxPreview(item.gpxData.trackData);
 }
 
 function saveBatchFormState(idx) {
@@ -3704,6 +3737,7 @@ function clearBatchQueue() {
   bindGpxInput();
   clearForm();
   gpxTrackData = null; gpxSpeedData = null; gpxTimesData = null; gpxElevData = null;
+  clearGpxPreview();
   document.getElementById('saveBtn').textContent = 'Save Trail';
   document.getElementById('fDate').value = new Date().toISOString().split('T')[0];
 }
