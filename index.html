@@ -2702,10 +2702,10 @@ document.getElementById('starInput').addEventListener('mouseleave', ()=>starEls.
 function bindGpxInput() {
   const drop = document.getElementById('gpxDrop'), inp = document.getElementById('gpxFile');
   if (!drop||!inp) return;
-  drop.addEventListener('click', ()=>inp.click());
-  drop.addEventListener('dragover', e=>{ e.preventDefault(); drop.classList.add('drag-over'); });
-  drop.addEventListener('dragleave', ()=>drop.classList.remove('drag-over'));
-  drop.addEventListener('drop', e=>{ e.preventDefault(); drop.classList.remove('drag-over'); if(e.dataTransfer.files.length) handleGPXFile(e.dataTransfer.files[0]); });
+  drop.onclick = ()=>inp.click();
+  drop.ondragover = e=>{ e.preventDefault(); drop.classList.add('drag-over'); };
+  drop.ondragleave = ()=>drop.classList.remove('drag-over');
+  drop.ondrop = e=>{ e.preventDefault(); drop.classList.remove('drag-over'); if(e.dataTransfer.files.length) handleGPXFile(e.dataTransfer.files[0]); };
   inp.addEventListener('change', e=>{ if(e.target.files.length) handleGPXFile(e.target.files[0]); });
 }
 
