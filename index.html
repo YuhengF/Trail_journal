@@ -1117,7 +1117,7 @@ img.leaflet-tile { image-rendering: auto; }
   position: fixed; bottom: 24px; right: 24px; z-index: 1400;
   background: var(--bg-panel); border: 1px solid var(--border);
   border-radius: var(--radius); box-shadow: var(--shadow-lg);
-  padding: 10px 14px 8px; width: 280px;
+  padding: 10px 12px 6px; width: 320px;
   opacity: 0; transform: translateY(12px);
   transition: opacity 0.2s ease, transform 0.2s ease, right 0.25s ease;
   pointer-events: none;
@@ -1127,7 +1127,7 @@ img.leaflet-tile { image-rendering: auto; }
   font-size: 10px; color: var(--text-muted); text-transform: uppercase;
   letter-spacing: 0.8px; margin-bottom: 4px;
 }
-.elev-profile canvas { display: block; width: 100%; height: 110px; border-radius: 4px; }
+.elev-profile canvas { display: block; width: 100%; height: 120px; }
 .elev-profile.with-detail { right: 424px; }
 @media (max-width: 800px) {
   .elev-profile { bottom: 70px; right: 10px; left: 10px; width: auto; }
@@ -2624,6 +2624,14 @@ function showElevationProfile(trail) {
   const coords = trail.coords;
   if (!elevs || !elevs.length || !coords || coords.length < 2) { hideElevationProfile(); return; }
 
+  const detailOpen = document.getElementById('detailPanel').classList.contains('open');
+  el.classList.toggle('with-detail', detailOpen);
+  el.classList.add('visible');
+
+  requestAnimationFrame(() => drawElevCanvas(canvas, elevs, coords));
+}
+
+function drawElevCanvas(canvas, elevs, coords) {
   const n = elevs.length;
   let cumDist = [0];
   if (n === coords.length) {
@@ -2645,75 +2653,87 @@ function showElevationProfile(trail) {
   const yTicks = niceElevTicks(minE, maxE, 4);
   const yMin = yTicks[0], yMax = yTicks[yTicks.length - 1];
   const yRange = yMax - yMin || 1;
-
   const xTicks = niceDistTicks(totalDistMi, 4);
 
-  const ctx = canvas.getContext('2d');
   const dpr = window.devicePixelRatio || 1;
-  const cssW = canvas.clientWidth, cssH = canvas.clientHeight;
-  canvas.width = cssW * dpr;
-  canvas.height = cssH * dpr;
+  let cssW = canvas.clientWidth, cssH = canvas.clientHeight;
+  if (!cssW) cssW = 296;
+  if (!cssH) cssH = 120;
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  const ctx = canvas.getContext('2d');
   ctx.scale(dpr, dpr);
-  const W = cssW, H = cssH;
 
-  const pad = { top: 8, bottom: 18, left: 38, right: 8 };
-  const pw = W - pad.left - pad.right, ph = H - pad.top - pad.bottom;
-  ctx.clearRect(0, 0, W, H);
+  const FONT = 'JetBrains Mono, monospace';
+  const pad = { top: 10, bottom: 20, left: 44, right: 10 };
+  const pw = cssW - pad.left - pad.right, ph = cssH - pad.top - pad.bottom;
 
   const toX = d => pad.left + (d / (totalDistMi || 1)) * pw;
   const toYv = v => pad.top + ph - ((v - yMin) / yRange) * ph;
 
-  ctx.font = '9px "JetBrains Mono", monospace';
-  ctx.textBaseline = 'middle';
-
-  // Y-axis grid lines + labels
+  // --- Y-axis: grid lines, tick marks, labels ---
+  ctx.font = `9px ${FONT}`;
   ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
   yTicks.forEach(v => {
-    const y = toYv(v);
+    const y = Math.round(toYv(v)) + 0.5;
+    // grid line
     ctx.beginPath();
     ctx.moveTo(pad.left, y);
     ctx.lineTo(pad.left + pw, y);
-    ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+    ctx.strokeStyle = 'rgba(0,0,0,0.07)';
     ctx.lineWidth = 1;
     ctx.stroke();
-    ctx.fillStyle = '#9e978e';
+    // tick mark
+    ctx.beginPath();
+    ctx.moveTo(pad.left - 3, y);
+    ctx.lineTo(pad.left, y);
+    ctx.strokeStyle = '#9e978e';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    // label
+    ctx.fillStyle = '#6b6660';
     const label = v >= 10000 ? (v/1000).toFixed(0)+'k' : v.toLocaleString();
-    ctx.fillText(label, pad.left - 5, y);
+    ctx.fillText(label, pad.left - 6, y);
   });
 
-  // "ft" unit label
-  ctx.textAlign = 'left';
-  ctx.fillStyle = '#b5afa6';
-  ctx.font = '8px "JetBrains Mono", monospace';
-  ctx.fillText('ft', 2, pad.top - 1);
-  ctx.font = '9px "JetBrains Mono", monospace';
+  // Y-axis unit label
+  ctx.font = `bold 8px ${FONT}`;
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'bottom';
+  ctx.fillStyle = '#9e978e';
+  ctx.fillText('ft', pad.left - 6, pad.top - 1);
 
-  // X-axis tick labels
+  // --- X-axis: tick marks + labels ---
+  ctx.font = `9px ${FONT}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   xTicks.forEach(d => {
     if (d > totalDistMi * 1.01) return;
-    const x = toX(d);
+    const x = Math.round(toX(d)) + 0.5;
+    // tick mark
     ctx.beginPath();
     ctx.moveTo(x, pad.top + ph);
     ctx.lineTo(x, pad.top + ph + 4);
-    ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+    ctx.strokeStyle = '#9e978e';
     ctx.lineWidth = 1;
     ctx.stroke();
-    ctx.fillStyle = '#9e978e';
-    ctx.fillText(d % 1 === 0 ? d.toFixed(0) : d.toFixed(1), x, pad.top + ph + 5);
+    // label
+    ctx.fillStyle = '#6b6660';
+    ctx.fillText(d % 1 === 0 ? d.toFixed(0) : d.toFixed(1), x, pad.top + ph + 6);
   });
 
-  // "mi" unit label
-  ctx.textAlign = 'right';
-  ctx.fillStyle = '#b5afa6';
-  ctx.font = '8px "JetBrains Mono", monospace';
-  ctx.fillText('mi', pad.left + pw + 6, pad.top + ph + 5);
-  ctx.font = '9px "JetBrains Mono", monospace';
+  // X-axis unit label
+  ctx.font = `bold 8px ${FONT}`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = '#9e978e';
+  const lastXTick = xTicks.filter(d => d <= totalDistMi * 1.01).pop() || 0;
+  ctx.fillText('mi', toX(lastXTick) + 10, pad.top + ph + 6);
 
-  // Filled area
+  // --- Chart: filled area ---
   const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + ph);
-  grad.addColorStop(0, 'rgba(199, 98, 58, 0.30)');
+  grad.addColorStop(0, 'rgba(199, 98, 58, 0.28)');
   grad.addColorStop(1, 'rgba(199, 98, 58, 0.03)');
   ctx.beginPath();
   ctx.moveTo(toX(cumDistMi[0]), toYv(yMin));
@@ -2723,18 +2743,24 @@ function showElevationProfile(trail) {
   ctx.fillStyle = grad;
   ctx.fill();
 
-  // Stroke line
+  // --- Chart: stroke line ---
   ctx.beginPath();
   ctx.moveTo(toX(cumDistMi[0]), toYv(smoothed[0]));
   for (let i = 1; i < n; i++) ctx.lineTo(toX(cumDistMi[i]), toYv(smoothed[i]));
   ctx.strokeStyle = '#c7623a';
   ctx.lineWidth = 1.5;
   ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
   ctx.stroke();
 
-  const detailOpen = document.getElementById('detailPanel').classList.contains('open');
-  el.classList.toggle('with-detail', detailOpen);
-  el.classList.add('visible');
+  // --- Axis lines (L-shape) ---
+  ctx.beginPath();
+  ctx.moveTo(pad.left, pad.top);
+  ctx.lineTo(pad.left, pad.top + ph);
+  ctx.lineTo(pad.left + pw, pad.top + ph);
+  ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
 }
 
 function hideElevationProfile() {
