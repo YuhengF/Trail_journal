@@ -479,6 +479,78 @@ body {
 }
 .gpx-autofilled label { color: var(--green); transition: color 1.5s ease-out; }
 
+/* BATCH GPX QUEUE */
+.batch-queue {
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.batch-queue-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-light);
+  font-size: 12px; font-weight: 500;
+}
+.batch-queue-header .batch-count { color: var(--text-dim); }
+.batch-queue-actions { display: flex; gap: 6px; align-items: center; }
+.batch-queue-actions button {
+  background: none; border: none; font-size: 11px;
+  color: var(--accent); cursor: pointer; font-family: inherit;
+  padding: 2px 6px; border-radius: 4px;
+}
+.batch-queue-actions button:hover { background: var(--accent-soft); }
+.batch-queue-list {
+  max-height: 180px; overflow-y: auto;
+}
+.batch-queue-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; cursor: pointer; font-size: 12px;
+  border-bottom: 1px solid var(--border-light);
+  transition: background 0.15s;
+}
+.batch-queue-item:last-child { border-bottom: none; }
+.batch-queue-item:hover { background: var(--bg-hover); }
+.batch-queue-item.active {
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent); padding-left: 9px;
+}
+.batch-queue-item.saved { opacity: 0.55; cursor: default; }
+.batch-queue-item .bq-status {
+  width: 16px; height: 16px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 10px;
+}
+.batch-queue-item .bq-status .dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--border);
+}
+.batch-queue-item.active .bq-status .dot { background: var(--accent); }
+.batch-queue-item.saved .bq-status { color: var(--green); font-size: 13px; }
+.batch-queue-item .bq-name {
+  flex: 1; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; font-weight: 500;
+}
+.batch-queue-item.saved .bq-name {
+  text-decoration: line-through; text-decoration-color: var(--border);
+}
+.batch-queue-item .bq-stats {
+  flex-shrink: 0; color: var(--text-muted); font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.batch-save-all {
+  padding: 8px 12px; background: var(--bg-card);
+  border-top: 1px solid var(--border-light); text-align: center;
+}
+.batch-save-all button {
+  background: none; border: 1px solid var(--border); font-size: 11px;
+  color: var(--text-dim); cursor: pointer; font-family: inherit;
+  padding: 5px 14px; border-radius: 6px; transition: all 0.15s;
+}
+.batch-save-all button:hover {
+  border-color: var(--green); color: var(--green); background: var(--green-soft);
+}
+.batch-add-more { display: none; }
+
 /* TRIM TRACK FLOATING PANEL */
 .trim-panel {
   position: fixed;
@@ -1295,10 +1367,12 @@ img.leaflet-tile { image-rendering: auto; }
     </div>
     <div class="modal-body">
       <div class="gpx-drop-zone" id="gpxDrop">
-        <div>📂 Drop a GPX file here or click to import</div>
-        <div style="font-size:10px;margin-top:4px;color:var(--text-muted)">Auto-fills track, distance & elevation</div>
-        <input type="file" id="gpxFile" accept=".gpx">
+        <div>📂 Drop GPX files here or click to import</div>
+        <div style="font-size:10px;margin-top:4px;color:var(--text-muted)">Auto-fills track, distance & elevation · drop multiple to batch-import</div>
+        <input type="file" id="gpxFile" accept=".gpx" multiple>
       </div>
+      <div id="batchQueue"></div>
+      <input type="file" id="batchAddMoreInput" accept=".gpx" multiple class="batch-add-more">
       <div class="form-group"><label>Trail Name *</label><input type="text" id="fName" placeholder="e.g. Mission Peak Loop"></div>
       <div class="form-row">
         <div class="form-group date-field-wrapper" onclick="document.getElementById('fDatePicker').showPicker()"><label>Date</label><input type="text" id="fDate" placeholder="YYYY-MM-DD" readonly><input type="date" id="fDatePicker" class="date-picker-ghost" onfocus="this.value=document.getElementById('fDate').value" onchange="document.getElementById('fDate').value=this.value"></div>
@@ -1456,6 +1530,7 @@ const SYNC_CONFIG_KEY = 'trail_journal_sync';
 const TOMBSTONE_KEY = 'trail_journal_tombstones';
 let trails = [];
 let editingId = null, selectedId = null, currentRating = 0, gpxTrackData = null, gpxSpeedData = null, gpxTimesData = null, gpxElevData = null;
+let batchQueue = [], batchCurrentIdx = -1;
 let trailsVisible = true, focusedTrailId = null, savedMapView = null;
 let syncPending = false;
 let ghSha = null;
@@ -3195,12 +3270,16 @@ document.querySelectorAll('.map-controls button[data-layer]').forEach(btn => {
 // ===== MODAL =====
 function openAddModal() {
   editingId = null; gpxTrackData = null; gpxSpeedData = null; gpxTimesData = null; gpxElevData = null;
+  batchQueue = []; batchCurrentIdx = -1;
+  document.getElementById('batchQueue').innerHTML = '';
   document.getElementById('modalTitle').textContent = 'Add Trail';
   document.getElementById('saveBtn').textContent = 'Save Trail';
   clearForm();
   const fd = document.getElementById('fDate'); fd.value = new Date().toISOString().split('T')[0];
   document.getElementById('modalOverlay').classList.add('open');
-  document.getElementById('gpxDrop').innerHTML = `<div>📂 Drop a GPX file here or click to import</div><div style="font-size:10px;margin-top:4px;color:var(--text-muted)">Auto-fills track, distance & elevation</div><input type="file" id="gpxFile" accept=".gpx">`;
+  const gpxDrop = document.getElementById('gpxDrop');
+  gpxDrop.style.display = '';
+  gpxDrop.innerHTML = `<div>📂 Drop GPX files here or click to import</div><div style="font-size:10px;margin-top:4px;color:var(--text-muted)">Auto-fills track, distance & elevation · drop multiple to batch-import</div><input type="file" id="gpxFile" accept=".gpx" multiple>`;
   bindGpxInput();
   renderModalTagPicker();
   if (window.innerWidth <= 800) document.getElementById('sidebar').classList.remove('mobile-visible');
@@ -3209,6 +3288,8 @@ function openAddModal() {
 function openEditModal(id) {
   const t = trails.find(x => x.id===id); if (!t) return;
   editingId = id; gpxTrackData = t.coords || null; gpxSpeedData = t.speedData || null; gpxTimesData = t.gpxTimes || null; gpxElevData = t.gpxElevations || null;
+  batchQueue = []; batchCurrentIdx = -1;
+  document.getElementById('batchQueue').innerHTML = '';
   document.getElementById('modalTitle').textContent = 'Edit Trail';
   document.getElementById('saveBtn').textContent = 'Update Trail';
   document.getElementById('fName').value = t.name||'';
@@ -3225,7 +3306,9 @@ function openEditModal(id) {
   document.getElementById('fNotes').value = t.notes||'';
   loadExistingPhotos(t.photos || []);
   document.getElementById('fCoords').value = t.coords ? JSON.stringify(t.coords) : '';
-  document.getElementById('gpxDrop').innerHTML = t.coords
+  const gpxDrop = document.getElementById('gpxDrop');
+  gpxDrop.style.display = '';
+  gpxDrop.innerHTML = t.coords
     ? `<div style="color:var(--green)">✓ Existing track — ${t.coords.length} points</div>`
     : `<div>📂 Drop a GPX file here or click to import</div><div style="font-size:10px;margin-top:4px;color:var(--text-muted)">Auto-fills track, distance & elevation</div><input type="file" id="gpxFile" accept=".gpx">`;
   bindGpxInput();
@@ -3236,6 +3319,7 @@ function openEditModal(id) {
 function closeModal(e) {
   if (e && e.target !== e.currentTarget) return;
   document.getElementById('modalOverlay').classList.remove('open');
+  batchQueue = []; batchCurrentIdx = -1;
   if (window.innerWidth <= 800) switchMobileTab('list');
 }
 
@@ -3249,6 +3333,10 @@ function clearForm() {
 }
 
 async function saveTrail() {
+  if (batchQueue.length > 0 && batchQueue.every(b => b.saved)) {
+    closeModal(); renderList(); renderMap();
+    return;
+  }
   const name = document.getElementById('fName').value.trim();
   if (!name) { document.getElementById('fName').focus(); return; }
   let coords = gpxTrackData;
@@ -3278,7 +3366,23 @@ async function saveTrail() {
   };
   if (editingId) { const idx = trails.findIndex(t=>t.id===editingId); if (idx>=0) trails[idx]=trail; }
   else trails.push(trail);
-  saveData(); closeModal(); renderList(); renderMap();
+  saveData();
+
+  if (batchQueue.length > 0 && batchCurrentIdx >= 0) {
+    batchQueue[batchCurrentIdx].saved = true;
+    renderList(); renderMap();
+    const nextIdx = batchQueue.findIndex((b, i) => i > batchCurrentIdx && !b.saved);
+    const fallbackIdx = batchQueue.findIndex(b => !b.saved);
+    const next = nextIdx >= 0 ? nextIdx : fallbackIdx;
+    if (next >= 0) {
+      selectBatchItem(next);
+    } else {
+      renderBatchQueue(); updateBatchSaveButton();
+    }
+    return;
+  }
+
+  closeModal(); renderList(); renderMap();
   if (trail.coords) setTimeout(()=>openDetail(trail.id), 200);
 }
 
@@ -3298,8 +3402,17 @@ function bindGpxInput() {
   drop.onclick = ()=>inp.click();
   drop.ondragover = e=>{ e.preventDefault(); drop.classList.add('drag-over'); };
   drop.ondragleave = ()=>drop.classList.remove('drag-over');
-  drop.ondrop = e=>{ e.preventDefault(); drop.classList.remove('drag-over'); if(e.dataTransfer.files.length) handleGPXFile(e.dataTransfer.files[0]); };
-  inp.addEventListener('change', e=>{ if(e.target.files.length) handleGPXFile(e.target.files[0]); });
+  drop.ondrop = e=>{
+    e.preventDefault(); drop.classList.remove('drag-over');
+    const files = [...e.dataTransfer.files].filter(f => f.name.toLowerCase().endsWith('.gpx'));
+    if (files.length > 1) handleMultipleGPXFiles(files);
+    else if (files.length === 1) handleGPXFile(files[0]);
+  };
+  inp.addEventListener('change', e=>{
+    const files = [...e.target.files];
+    if (files.length > 1) handleMultipleGPXFiles(files);
+    else if (files.length === 1) handleGPXFile(files[0]);
+  });
 }
 
 function gpxAutoFill(fieldId, value, overrideDefault) {
@@ -3362,6 +3475,275 @@ function handleGPXFile(file) {
   reader.readAsText(file);
 }
 bindGpxInput();
+
+// ===== BATCH GPX IMPORT =====
+function handleMultipleGPXFiles(files) {
+  batchQueue = [];
+  batchCurrentIdx = -1;
+  let parsed = 0;
+  const totalFiles = files.length;
+
+  [...files].forEach((file) => {
+    const fileName = file.name.replace(/\.gpx$/i, '');
+    const fileDate = new Date(file.lastModified);
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const r = parseGPX(ev.target.result);
+        const trailName = r.name || fileName;
+        let trailDateStr = null;
+        if (r.startDate && !isNaN(r.startDate.getTime())) {
+          trailDateStr = r.startDate.toISOString().split('T')[0];
+        }
+        if (!trailDateStr) {
+          const dateFromFile = fileName.match(/(\d{4}-\d{2}-\d{2})/);
+          const dateFromName = r.name ? r.name.match(/(\d{4}-\d{2}-\d{2})/) : null;
+          if (dateFromFile) trailDateStr = dateFromFile[1];
+          else if (dateFromName) trailDateStr = dateFromName[1];
+          else if (fileDate && !isNaN(fileDate.getTime())) trailDateStr = fileDate.toISOString().split('T')[0];
+        }
+        batchQueue.push({
+          parsed: r,
+          name: trailName,
+          date: trailDateStr || new Date().toISOString().split('T')[0],
+          formState: {
+            name: trailName,
+            date: trailDateStr || new Date().toISOString().split('T')[0],
+            status: 'completed',
+            distance: r.distance || '',
+            elevation: r.elevation || '',
+            duration: r.duration || '',
+            difficulty: '',
+            rating: 0,
+            tags: '',
+            weather: '',
+            companions: '',
+            notes: '',
+            coords: r.coords ? JSON.stringify(r.coords) : ''
+          },
+          gpxData: {
+            trackData: r.coords,
+            speedData: r.speedData || null,
+            timesData: r.times || null,
+            elevData: (r.elevations && r.elevations.length === r.coords.length) ? r.elevations : null
+          },
+          saved: false
+        });
+      } catch(err) {
+        console.warn('Failed to parse ' + file.name + ':', err);
+      }
+      parsed++;
+      if (parsed === totalFiles) finalizeBatchLoad();
+    };
+    reader.readAsText(file);
+  });
+}
+
+function addMoreBatchFiles() {
+  const inp = document.getElementById('batchAddMoreInput');
+  inp.onchange = e => {
+    const files = [...e.target.files].filter(f => f.name.toLowerCase().endsWith('.gpx'));
+    if (!files.length) return;
+    let parsed = 0;
+    files.forEach(file => {
+      const fileName = file.name.replace(/\.gpx$/i, '');
+      const fileDate = new Date(file.lastModified);
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          const r = parseGPX(ev.target.result);
+          const trailName = r.name || fileName;
+          let trailDateStr = null;
+          if (r.startDate && !isNaN(r.startDate.getTime())) trailDateStr = r.startDate.toISOString().split('T')[0];
+          if (!trailDateStr) {
+            const dateFromFile = fileName.match(/(\d{4}-\d{2}-\d{2})/);
+            const dateFromName = r.name ? r.name.match(/(\d{4}-\d{2}-\d{2})/) : null;
+            if (dateFromFile) trailDateStr = dateFromFile[1];
+            else if (dateFromName) trailDateStr = dateFromName[1];
+            else if (fileDate && !isNaN(fileDate.getTime())) trailDateStr = fileDate.toISOString().split('T')[0];
+          }
+          batchQueue.push({
+            parsed: r, name: trailName,
+            date: trailDateStr || new Date().toISOString().split('T')[0],
+            formState: {
+              name: trailName, date: trailDateStr || new Date().toISOString().split('T')[0],
+              status: 'completed', distance: r.distance || '', elevation: r.elevation || '',
+              duration: r.duration || '', difficulty: '', rating: 0, tags: '',
+              weather: '', companions: '', notes: '',
+              coords: r.coords ? JSON.stringify(r.coords) : ''
+            },
+            gpxData: {
+              trackData: r.coords, speedData: r.speedData || null,
+              timesData: r.times || null,
+              elevData: (r.elevations && r.elevations.length === r.coords.length) ? r.elevations : null
+            },
+            saved: false
+          });
+        } catch(err) { console.warn('Failed to parse ' + file.name + ':', err); }
+        parsed++;
+        if (parsed === files.length) { renderBatchQueue(); updateBatchSaveButton(); }
+      };
+      reader.readAsText(file);
+    });
+    inp.value = '';
+  };
+  inp.click();
+}
+
+function finalizeBatchLoad() {
+  if (!batchQueue.length) return;
+  batchQueue.sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.name || '').localeCompare(b.name || ''));
+  document.getElementById('gpxDrop').style.display = 'none';
+  renderBatchQueue();
+  selectBatchItem(0);
+  updateBatchSaveButton();
+}
+
+function renderBatchQueue() {
+  const container = document.getElementById('batchQueue');
+  const savedCount = batchQueue.filter(b => b.saved).length;
+  const total = batchQueue.length;
+  let h = '<div class="batch-queue">';
+  h += '<div class="batch-queue-header">';
+  h += `<span class="batch-count">${savedCount} of ${total} trail${total !== 1 ? 's' : ''} saved</span>`;
+  h += '<div class="batch-queue-actions">';
+  h += '<button onclick="addMoreBatchFiles()">+ Add</button>';
+  h += '<button onclick="clearBatchQueue()">✕ Clear</button>';
+  h += '</div></div>';
+  h += '<div class="batch-queue-list">';
+  batchQueue.forEach((item, i) => {
+    const isActive = i === batchCurrentIdx;
+    const cls = ['batch-queue-item', isActive ? 'active' : '', item.saved ? 'saved' : ''].filter(Boolean).join(' ');
+    const statusIcon = item.saved
+      ? '<span class="bq-status">✓</span>'
+      : '<span class="bq-status"><span class="dot"></span></span>';
+    const stats = [
+      item.parsed.distance ? item.parsed.distance + 'mi' : '',
+      item.parsed.elevation ? '▲' + item.parsed.elevation + 'ft' : ''
+    ].filter(Boolean).join(' ');
+    h += `<div class="${cls}" onclick="selectBatchItem(${i})">`;
+    h += statusIcon;
+    h += `<span class="bq-name">${item.name}</span>`;
+    if (stats) h += `<span class="bq-stats">${stats}</span>`;
+    h += '</div>';
+  });
+  h += '</div>';
+  const unsavedCount = total - savedCount;
+  if (unsavedCount > 1) {
+    h += `<div class="batch-save-all"><button onclick="saveAllBatch()">Quick-save all ${unsavedCount} remaining</button></div>`;
+  }
+  h += '</div>';
+  container.innerHTML = h;
+}
+
+function selectBatchItem(idx) {
+  if (idx < 0 || idx >= batchQueue.length || batchQueue[idx].saved) return;
+  if (batchCurrentIdx >= 0 && batchCurrentIdx < batchQueue.length && !batchQueue[batchCurrentIdx].saved) {
+    saveBatchFormState(batchCurrentIdx);
+  }
+  batchCurrentIdx = idx;
+  const item = batchQueue[idx];
+  gpxTrackData = item.gpxData.trackData;
+  gpxSpeedData = item.gpxData.speedData;
+  gpxTimesData = item.gpxData.timesData;
+  gpxElevData = item.gpxData.elevData;
+  const fs = item.formState;
+  document.getElementById('fName').value = fs.name || '';
+  document.getElementById('fDate').value = fs.date || '';
+  document.getElementById('fStatus').value = fs.status || 'completed';
+  document.getElementById('fDistance').value = fs.distance || '';
+  document.getElementById('fElevation').value = fs.elevation || '';
+  document.getElementById('fDuration').value = fs.duration || '';
+  document.getElementById('fDifficulty').value = fs.difficulty || '';
+  setStars(fs.rating || 0);
+  document.getElementById('fTags').value = fs.tags || '';
+  document.getElementById('fWeather').value = fs.weather || '';
+  document.getElementById('fCompanions').value = fs.companions || '';
+  document.getElementById('fNotes').value = fs.notes || '';
+  document.getElementById('fCoords').value = fs.coords || '';
+  clearFormPhotos();
+  renderBatchQueue();
+  updateBatchSaveButton();
+}
+
+function saveBatchFormState(idx) {
+  if (idx < 0 || idx >= batchQueue.length) return;
+  batchQueue[idx].formState = {
+    name: document.getElementById('fName').value,
+    date: document.getElementById('fDate').value,
+    status: document.getElementById('fStatus').value,
+    distance: document.getElementById('fDistance').value,
+    elevation: document.getElementById('fElevation').value,
+    duration: document.getElementById('fDuration').value,
+    difficulty: document.getElementById('fDifficulty').value,
+    rating: currentRating,
+    tags: document.getElementById('fTags').value,
+    weather: document.getElementById('fWeather').value,
+    companions: document.getElementById('fCompanions').value,
+    notes: document.getElementById('fNotes').value,
+    coords: document.getElementById('fCoords').value
+  };
+  batchQueue[idx].name = document.getElementById('fName').value.trim() || batchQueue[idx].name;
+}
+
+function updateBatchSaveButton() {
+  if (!batchQueue.length) return;
+  const btn = document.getElementById('saveBtn');
+  const unsaved = batchQueue.filter(b => !b.saved).length;
+  if (unsaved > 1) btn.textContent = 'Save & Next \u203a';
+  else if (unsaved === 1) btn.textContent = 'Save Last Trail';
+  else btn.textContent = 'All Saved \u2014 Close';
+}
+
+function clearBatchQueue() {
+  batchQueue = []; batchCurrentIdx = -1;
+  document.getElementById('batchQueue').innerHTML = '';
+  const gpxDrop = document.getElementById('gpxDrop');
+  gpxDrop.style.display = '';
+  gpxDrop.innerHTML = `<div>📂 Drop GPX files here or click to import</div><div style="font-size:10px;margin-top:4px;color:var(--text-muted)">Auto-fills track, distance & elevation · drop multiple to batch-import</div><input type="file" id="gpxFile" accept=".gpx" multiple>`;
+  bindGpxInput();
+  clearForm();
+  gpxTrackData = null; gpxSpeedData = null; gpxTimesData = null; gpxElevData = null;
+  document.getElementById('saveBtn').textContent = 'Save Trail';
+  document.getElementById('fDate').value = new Date().toISOString().split('T')[0];
+}
+
+async function saveAllBatch() {
+  if (batchCurrentIdx >= 0 && batchCurrentIdx < batchQueue.length && !batchQueue[batchCurrentIdx].saved) {
+    saveBatchFormState(batchCurrentIdx);
+  }
+  for (let i = 0; i < batchQueue.length; i++) {
+    if (batchQueue[i].saved) continue;
+    const item = batchQueue[i];
+    const fs = item.formState;
+    const name = (fs.name || '').trim();
+    if (!name) continue;
+    let coords = item.gpxData.trackData;
+    if (!coords) { try { const raw = (fs.coords || '').trim(); if (raw) coords = JSON.parse(raw); } catch(e) {} }
+    const timesArr = item.gpxData.timesData;
+    trails.push({
+      id: genId(), name,
+      date: fs.date || '', status: fs.status || 'completed',
+      distance: fs.distance || '', elevation: fs.elevation || '',
+      duration: fs.duration || '', difficulty: fs.difficulty || '',
+      rating: fs.rating || 0,
+      tags: (fs.tags || '').split(',').map(s => s.trim()).filter(Boolean),
+      weather: (fs.weather || '').trim(),
+      companions: (fs.companions || '').trim(),
+      notes: (fs.notes || '').trim(),
+      photos: [], coords,
+      speedData: item.gpxData.speedData,
+      gpxElevations: item.gpxData.elevData,
+      gpxTimes: timesArr,
+      timeRange: timeRangeFromTimes(timesArr, 0, timesArr ? timesArr.length : 0),
+      updatedAt: Date.now()
+    });
+    batchQueue[i].saved = true;
+  }
+  saveData();
+  closeModal();
+  renderList(); renderMap();
+}
 
 // ===== DRAW ON MAP =====
 let drawMode = false;
