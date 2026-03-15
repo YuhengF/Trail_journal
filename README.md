@@ -18,7 +18,7 @@ I used claude to write this app to track my personal hiking record. I tried to i
 5. The trails data rely on GPX files (.GPX is a GPS data format). One way to obtain it is to export apple watch health data (you can easily find your workout routes in GPX format in the exported zip).
 
 
-## Notes for myself or users who store their data under my github account:
+## Notes for myself or users who want to know how I store their data under my github account:
 Managing data for people who don't use github (their data will be hosted under my account)
 
 1. Create private repo, say, named "data_tom". Then create fine-grained token to access this data repo (under Developer Settings -> Personal access tokens (Fine-grained tokens) -> Generate new token -> Token name, appropriate expiration time -> only selected repo -> select that private data repo for user -> Add permissions -> contents -> read and write -> done -> send that token to user);
