@@ -2599,7 +2599,7 @@ async function syncToGitHub() {
     const indent = (cfg.encrypt && cfg.passphrase) ? undefined : 2;
     const content = btoa(unescape(encodeURIComponent(JSON.stringify(finalPayload, null, indent))));
     const body = {
-      message: `Update trails — ${new Date().toISOString().split('T')[0]}`,
+      message: `Update trails — ${toLocalDateStr(new Date())}`,
       content: content
     };
     if (ghSha) body.sha = ghSha;
@@ -3194,6 +3194,10 @@ function toggleTrailVisibility() {
   }
 }
 
+function toLocalDateStr(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
 // ===== GPX PARSER =====
 function parseGPX(xmlStr) {
   const doc = new DOMParser().parseFromString(xmlStr, 'text/xml');
@@ -3691,7 +3695,7 @@ function openAddModal() {
   document.getElementById('modalTitle').textContent = 'Add Trail';
   document.getElementById('saveBtn').textContent = 'Save Trail';
   clearForm();
-  const fd = document.getElementById('fDate'); fd.value = new Date().toISOString().split('T')[0];
+  const fd = document.getElementById('fDate'); fd.value = toLocalDateStr(new Date());
   document.getElementById('modalOverlay').classList.add('open');
   const gpxDrop = document.getElementById('gpxDrop');
   gpxDrop.style.display = '';
@@ -3868,14 +3872,14 @@ function handleGPXFile(file) {
       // Date: GPS timestamps > filename regex > GPX name regex > file.lastModified
       let trailDateStr = null;
       if (r.startDate && !isNaN(r.startDate.getTime())) {
-        trailDateStr = r.startDate.toISOString().split('T')[0];
+        trailDateStr = toLocalDateStr(r.startDate);
       }
       if (!trailDateStr) {
         const dateFromFile = fileName.match(/(\d{4}-\d{2}-\d{2})/);
         const dateFromName = r.name ? r.name.match(/(\d{4}-\d{2}-\d{2})/) : null;
         if (dateFromFile) trailDateStr = dateFromFile[1];
         else if (dateFromName) trailDateStr = dateFromName[1];
-        else if (fileDate && !isNaN(fileDate.getTime())) trailDateStr = fileDate.toISOString().split('T')[0];
+        else if (fileDate && !isNaN(fileDate.getTime())) trailDateStr = toLocalDateStr(fileDate);
       }
       gpxAutoFill('fDate', trailDateStr, !editingId);
 
@@ -3913,22 +3917,22 @@ function handleMultipleGPXFiles(files) {
         const trailName = r.name || fileName;
         let trailDateStr = null;
         if (r.startDate && !isNaN(r.startDate.getTime())) {
-          trailDateStr = r.startDate.toISOString().split('T')[0];
+          trailDateStr = toLocalDateStr(r.startDate);
         }
         if (!trailDateStr) {
           const dateFromFile = fileName.match(/(\d{4}-\d{2}-\d{2})/);
           const dateFromName = r.name ? r.name.match(/(\d{4}-\d{2}-\d{2})/) : null;
           if (dateFromFile) trailDateStr = dateFromFile[1];
           else if (dateFromName) trailDateStr = dateFromName[1];
-          else if (fileDate && !isNaN(fileDate.getTime())) trailDateStr = fileDate.toISOString().split('T')[0];
+          else if (fileDate && !isNaN(fileDate.getTime())) trailDateStr = toLocalDateStr(fileDate);
         }
         batchQueue.push({
           parsed: r,
           name: trailName,
-          date: trailDateStr || new Date().toISOString().split('T')[0],
+          date: trailDateStr || toLocalDateStr(new Date()),
           formState: {
             name: trailName,
-            date: trailDateStr || new Date().toISOString().split('T')[0],
+            date: trailDateStr || toLocalDateStr(new Date()),
             status: 'completed',
             distance: r.distance || '',
             elevation: r.elevation || '',
@@ -3974,19 +3978,19 @@ function addMoreBatchFiles() {
           const r = parseGPX(ev.target.result);
           const trailName = r.name || fileName;
           let trailDateStr = null;
-          if (r.startDate && !isNaN(r.startDate.getTime())) trailDateStr = r.startDate.toISOString().split('T')[0];
+          if (r.startDate && !isNaN(r.startDate.getTime())) trailDateStr = toLocalDateStr(r.startDate);
           if (!trailDateStr) {
             const dateFromFile = fileName.match(/(\d{4}-\d{2}-\d{2})/);
             const dateFromName = r.name ? r.name.match(/(\d{4}-\d{2}-\d{2})/) : null;
             if (dateFromFile) trailDateStr = dateFromFile[1];
             else if (dateFromName) trailDateStr = dateFromName[1];
-            else if (fileDate && !isNaN(fileDate.getTime())) trailDateStr = fileDate.toISOString().split('T')[0];
+            else if (fileDate && !isNaN(fileDate.getTime())) trailDateStr = toLocalDateStr(fileDate);
           }
           batchQueue.push({
             parsed: r, name: trailName,
-            date: trailDateStr || new Date().toISOString().split('T')[0],
+            date: trailDateStr || toLocalDateStr(new Date()),
             formState: {
-              name: trailName, date: trailDateStr || new Date().toISOString().split('T')[0],
+              name: trailName, date: trailDateStr || toLocalDateStr(new Date()),
               status: 'completed', distance: r.distance || '', elevation: r.elevation || '',
               duration: r.duration || '', difficulty: '', rating: 0, tags: '',
               weather: '', companions: '', notes: '',
@@ -4181,7 +4185,7 @@ function clearBatchQueue() {
   gpxTrackData = null; gpxSpeedData = null; gpxTimesData = null; gpxElevData = null;
   clearGpxPreview();
   document.getElementById('saveBtn').textContent = 'Save Trail';
-  document.getElementById('fDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('fDate').value = toLocalDateStr(new Date());
 }
 
 async function saveAllBatch() {
@@ -4499,7 +4503,7 @@ function deleteTrail() {
 function exportData() {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([JSON.stringify(trails.map(compressTrailForStorage),null,2)], {type:'application/json'}));
-  a.download = `trail-journal-${new Date().toISOString().split('T')[0]}.json`;
+  a.download = `trail-journal-${toLocalDateStr(new Date())}.json`;
   a.click();
 }
 
