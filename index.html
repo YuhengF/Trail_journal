@@ -1074,7 +1074,7 @@ img.leaflet-tile { image-rendering: auto; }
     </div>
 
     <div class="trail-conditions" id="trailConditions">
-      <span class="tc-label">Conditions</span>
+      <span class="tc-label">Local Conditions</span>
       <span class="tc-dot" id="tcDot"></span>
       <span class="tc-status" id="tcStatus">Loading...</span>
       <button class="tc-refresh" onclick="refreshTrailConditions()" title="Refresh">↻</button>
@@ -1360,10 +1360,19 @@ const TRAIL_COLORS = [
 // ===== TRAIL CONDITIONS (RAINFALL) =====
 const TC_CACHE_KEY = 'trail_conditions_cache';
 const TC_MAX_RETRIES = 10;
-let tcLastCoord = null;
+let tcLastLat = null;
+let tcLastLon = null;
+const TC_REGION_THRESHOLD_DEG = 0.4; // ~44 km — keeps same metro area (e.g. Bay Area) as one region
 let tcDebounceTimer = null;
 let tcRetryTimer = null;
 let tcRetryCount = 0;
+
+function isSameRegion(lat, lon) {
+  if (tcLastLat === null) return false;
+  const dlat = lat - tcLastLat;
+  const dlon = (lon - tcLastLon) * Math.cos(((lat + tcLastLat) / 2) * Math.PI / 180);
+  return Math.sqrt(dlat * dlat + dlon * dlon) < TC_REGION_THRESHOLD_DEG;
+}
 
 function classifyCondition(dailyPrecip) {
   let recentRainMm = 0, daysAgo = -1;
@@ -1409,23 +1418,24 @@ function renderCondition(cond) {
   status.title = cond.label;
 }
 
-function coordKey(lat, lon) {
-  return `${lat.toFixed(1)},${lon.toFixed(1)}`;
-}
-
 async function fetchTrailConditions(forceRefresh) {
   if (!map) return;
   const center = map.getCenter();
-  const lat = Math.round(center.lat * 10) / 10;
-  const lon = Math.round(center.lng * 10) / 10;
-  const key = coordKey(lat, lon);
-  if (!forceRefresh && key === tcLastCoord) return;
+  const lat = center.lat;
+  const lon = center.lng;
+
+  if (!forceRefresh && isSameRegion(lat, lon)) return;
+
+  const rLat = Math.round(lat * 4) / 4;
+  const rLon = Math.round(lon * 4) / 4;
+  const key = `${rLat},${rLon}`;
 
   if (!forceRefresh) {
     try {
       const cache = JSON.parse(sessionStorage.getItem(TC_CACHE_KEY)) || {};
       if (cache[key] && Date.now() - cache[key].ts < 3 * 60 * 60 * 1000) {
-        tcLastCoord = key;
+        tcLastLat = lat;
+        tcLastLon = lon;
         renderCondition(cache[key].cond);
         return;
       }
@@ -1436,12 +1446,13 @@ async function fetchTrailConditions(forceRefresh) {
   document.getElementById('tcStatus').textContent = 'Loading...';
 
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=precipitation_sum&past_days=10&timezone=auto&forecast_days=0`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${rLat}&longitude=${rLon}&daily=precipitation_sum&past_days=10&timezone=auto&forecast_days=0`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const cond = classifyCondition(data.daily.precipitation_sum);
-    tcLastCoord = key;
+    tcLastLat = lat;
+    tcLastLon = lon;
     try {
       const cache = JSON.parse(sessionStorage.getItem(TC_CACHE_KEY)) || {};
       cache[key] = { ts: Date.now(), cond };
@@ -1460,7 +1471,8 @@ async function fetchTrailConditions(forceRefresh) {
 }
 
 function refreshTrailConditions() {
-  tcLastCoord = null;
+  tcLastLat = null;
+  tcLastLon = null;
   tcRetryCount = 0;
   clearTimeout(tcRetryTimer);
   fetchTrailConditions(true);
