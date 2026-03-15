@@ -2,7 +2,7 @@ I used claude to write this app to track my personal hiking record. I tried to i
 
 ## To use this app
 
-### If you dont want to touch any programming work:
+### If you don't want to touch any programming work:
 
 1. You can use my existing github page session **https://yuhengf.github.io/Trail_journal/**. In order to sync your data, you need to contact me to create a private data repo for you under my github account. If you don't enable Sync you can still use the app but then all data files will be saved locally on a single device (you can export the json and import it on other devices but it's a bit of hassle);
 2. First time usage (or on a new device): visit the app webpage **https://yuhengf.github.io/Trail_journal/** -> Click Sync (bottom left) -> enter four pieces of info: my github user name (YuhengF), the private data repo (I will tell you what is, something like "data_tom"), the token I give you (will be a very long string), data file path (default is data.json which is good; you can also name it your own way if you understand what .json kinda means, and it should be the same throught out the whole usage across devices) -> optional encrytion (**I won't be able to see your content at all after encrytion. User has to remember their passphrase otherwise they will forever lose access to their data**). You need to fill the same information again everytime you want to use it on a new device;
