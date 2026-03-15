@@ -938,6 +938,68 @@ img.leaflet-tile { image-rendering: auto; }
   .tag-chip { font-size: 12.5px; padding: 7px 13px; }
   .modal-tag-chip { font-size: 12px; padding: 5px 11px; }
 }
+
+/* TRAIL CONDITIONS */
+.trail-conditions {
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+.trail-conditions-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 20px 0;
+  cursor: pointer; user-select: none;
+}
+.trail-conditions-header span {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--text-muted);
+}
+.trail-conditions-header .tc-actions {
+  display: flex; gap: 4px; align-items: center;
+}
+.trail-conditions-header button {
+  background: none; border: none; color: var(--text-muted);
+  font-size: 13px; cursor: pointer; padding: 2px 4px;
+  border-radius: 4px; transition: all 0.15s; line-height: 1;
+}
+.trail-conditions-header button:hover { color: var(--text); background: var(--bg-hover); }
+.tc-body {
+  padding: 6px 20px 10px;
+  max-height: 300px; overflow-y: auto;
+  transition: max-height 0.25s ease, padding 0.25s ease, opacity 0.2s ease;
+}
+.tc-body.collapsed {
+  max-height: 0; padding-top: 0; padding-bottom: 0; opacity: 0;
+}
+.tc-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 0; font-size: 12px;
+}
+.tc-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.tc-dot.green { background: var(--green); }
+.tc-dot.yellow { background: #c9a227; }
+.tc-dot.orange { background: #d4782f; }
+.tc-dot.red { background: #c43e3e; }
+.tc-region {
+  font-weight: 500; color: var(--text); min-width: 90px; flex-shrink: 0;
+}
+.tc-detail {
+  color: var(--text-dim); flex: 1; text-align: right;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tc-loading {
+  font-size: 11px; color: var(--text-muted); padding: 8px 0;
+}
+.tc-error {
+  font-size: 11px; color: var(--accent); padding: 4px 0;
+}
+@media (max-width: 800px) {
+  .trail-conditions-header { padding: 6px 14px 0; }
+  .tc-body { padding: 4px 14px 6px; }
+  .tc-region { min-width: 70px; font-size: 11px; }
+  .tc-detail { font-size: 11px; }
+}
 </style>
 </head>
 <body>
@@ -958,6 +1020,19 @@ img.leaflet-tile { image-rendering: auto; }
         <div class="stat"><span class="stat-val" id="statElevation">0</span><span class="stat-label">Total ft ↑</span></div>
         <div class="stat"><span class="stat-val" id="statDuration">0h</span><span class="stat-label">Total Time</span></div>
         <div class="stat"><span class="stat-val" id="statWishlist">0</span><span class="stat-label">Wishlist</span></div>
+      </div>
+    </div>
+
+    <div class="trail-conditions" id="trailConditions">
+      <div class="trail-conditions-header" onclick="toggleConditionsPanel()">
+        <span>Trail Conditions</span>
+        <div class="tc-actions">
+          <button onclick="event.stopPropagation(); refreshTrailConditions()" title="Refresh">↻</button>
+          <button id="tcToggleBtn" title="Collapse">▾</button>
+        </div>
+      </div>
+      <div class="tc-body" id="tcBody">
+        <div class="tc-loading">Loading conditions...</div>
       </div>
     </div>
 
@@ -1217,6 +1292,113 @@ const TRAIL_COLORS = [
   '#e8552e','#2eaa55','#2e88dd','#b044dd','#dd9922',
   '#dd2266','#00bbaa','#7755ee','#ee7722','#44aa33'
 ];
+
+// ===== TRAIL CONDITIONS (RAINFALL) =====
+const WEATHER_REGIONS = [
+  { name: 'Bay Area',      lat: 37.87, lon: -122.27 },
+  { name: 'Marin',         lat: 37.92, lon: -122.60 },
+  { name: 'Big Sur',       lat: 36.24, lon: -121.81 },
+  { name: 'Sierra Foothill', lat: 37.75, lon: -119.60 },
+  { name: 'Tahoe',         lat: 39.09, lon: -120.04 },
+  { name: 'Pinnacles',     lat: 36.49, lon: -121.16 },
+  { name: 'Redwood Coast', lat: 41.21, lon: -124.00 },
+  { name: 'SoCal Mtns',    lat: 34.22, lon: -117.25 },
+];
+const TC_CACHE_KEY = 'trail_conditions_cache';
+const TC_CACHE_TTL = 3 * 60 * 60 * 1000; // 3 hours
+let tcCollapsed = false;
+
+function classifyCondition(dailyPrecip) {
+  const now = new Date();
+  now.setHours(0,0,0,0);
+  let recentRainMm = 0, daysAgo = -1;
+  let stormTotal = 0, stormDays = 0;
+  for (let i = dailyPrecip.length - 1; i >= 0; i--) {
+    const mm = dailyPrecip[i];
+    if (mm > 0.2) {
+      if (daysAgo === -1) {
+        recentRainMm = mm;
+        daysAgo = (dailyPrecip.length - 1) - i;
+      }
+      stormTotal += mm;
+      stormDays++;
+    } else if (daysAgo !== -1) {
+      break;
+    }
+  }
+  if (daysAgo === -1) return { dot: 'green', label: 'Trails likely dry and firm', rainMm: 0, daysAgo: -1 };
+  const effectiveMm = stormDays > 1 ? stormTotal : recentRainMm;
+  if (effectiveMm < 6) {
+    if (daysAgo === 0) return { dot: 'yellow', label: 'Light rain today, some dampness', rainMm: effectiveMm, daysAgo };
+    if (daysAgo <= 2) return { dot: 'yellow', label: 'Drying out, mostly surface moisture', rainMm: effectiveMm, daysAgo };
+    return { dot: 'green', label: 'Trails likely dry', rainMm: effectiveMm, daysAgo };
+  }
+  if (effectiveMm <= 25) {
+    if (daysAgo <= 1) return { dot: 'orange', label: 'Recent rain, expect mud on clay', rainMm: effectiveMm, daysAgo };
+    if (daysAgo <= 3) return { dot: 'yellow', label: 'Damp, clay soils may be muddy', rainMm: effectiveMm, daysAgo };
+    return { dot: 'green', label: 'Trails recovering, mostly dry', rainMm: effectiveMm, daysAgo };
+  }
+  if (daysAgo <= 2) return { dot: 'red', label: 'Heavy rain, muddy + high water', rainMm: effectiveMm, daysAgo };
+  if (daysAgo <= 4) return { dot: 'orange', label: 'Still drying, mud + high water', rainMm: effectiveMm, daysAgo };
+  return { dot: 'yellow', label: 'Recovering from heavy rain', rainMm: effectiveMm, daysAgo };
+}
+
+function renderTrailConditions(results) {
+  const body = document.getElementById('tcBody');
+  if (!results || results.length === 0) {
+    body.innerHTML = '<div class="tc-loading">No data available</div>';
+    return;
+  }
+  body.innerHTML = results.map(r => {
+    const rain = r.rainMm > 0 ? `${r.rainMm.toFixed(1)}mm` : '';
+    const ago = r.daysAgo < 0 ? 'No rain 10d' : r.daysAgo === 0 ? 'Today' : `${r.daysAgo}d ago`;
+    const detail = r.rainMm > 0 ? `${rain} ${ago}` : ago;
+    return `<div class="tc-row" title="${r.label}">
+      <span class="tc-dot ${r.dot}"></span>
+      <span class="tc-region">${r.name}</span>
+      <span class="tc-detail">${detail} · ${r.label}</span>
+    </div>`;
+  }).join('');
+}
+
+async function fetchTrailConditions(forceRefresh) {
+  if (!forceRefresh) {
+    try {
+      const cached = JSON.parse(sessionStorage.getItem(TC_CACHE_KEY));
+      if (cached && Date.now() - cached.ts < TC_CACHE_TTL) {
+        renderTrailConditions(cached.data);
+        return;
+      }
+    } catch {}
+  }
+  const body = document.getElementById('tcBody');
+  body.innerHTML = '<div class="tc-loading">Fetching rainfall data...</div>';
+  try {
+    const results = await Promise.all(WEATHER_REGIONS.map(async (region) => {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${region.lat}&longitude=${region.lon}&daily=precipitation_sum&past_days=10&timezone=America/Los_Angeles&forecast_days=0`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const precip = data.daily.precipitation_sum;
+      const cond = classifyCondition(precip);
+      return { name: region.name, ...cond };
+    }));
+    sessionStorage.setItem(TC_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: results }));
+    renderTrailConditions(results);
+  } catch (e) {
+    body.innerHTML = `<div class="tc-error">Could not load conditions</div>`;
+  }
+}
+
+function refreshTrailConditions() {
+  fetchTrailConditions(true);
+}
+
+function toggleConditionsPanel() {
+  tcCollapsed = !tcCollapsed;
+  document.getElementById('tcBody').classList.toggle('collapsed', tcCollapsed);
+  document.getElementById('tcToggleBtn').textContent = tcCollapsed ? '▸' : '▾';
+}
 
 // ===== LOCAL STORAGE =====
 function compressGpxTimes(times) {
@@ -2772,6 +2954,7 @@ map.on('click', (e) => {
   }
 });
 renderList(); renderMap();
+fetchTrailConditions(false);
 
 // Tag input → update modal tag picker chips in real time
 document.getElementById('fTags').addEventListener('input', renderModalTagPicker);
