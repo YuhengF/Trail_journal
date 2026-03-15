@@ -1,10 +1,10 @@
 I used claude to write this app to track my personal hiking record. I tried to include all functionalities I feel excited about (especially those not included by popular hiking apps, for example showing all past trails altogether on the map, which gives people sometimes sense of achievements as if they're wandering in their kindom of hiking realm). Bugs might exist, please feel free to leave a message for any comments of suggestions. 
 
-## To use it on your own device, 
+## To use this app
 
-### If you dont want to manage all the data and program and deployment work:
+### If you dont want to touch any programming work:
 
-1. You can also use my existing github page session **https://yuhengf.github.io/Trail_journal/**, but then all data files will be saved locally on single device if you don't enable Sync. In order to sync your data, you need to contact me to create a private data repo for you under my github account;
+1. You can use my existing github page session **https://yuhengf.github.io/Trail_journal/**, but then all data files will be saved locally on single device if you don't enable Sync. In order to sync your data, you need to contact me to create a private data repo for you under my github account;
 
 ### if you want to do everything yourself:
 
@@ -15,7 +15,7 @@ I used claude to write this app to track my personal hiking record. I tried to i
 5. The trails record rely on GPX files (.GPX is a GPS data format). One way to obtain it is to export apple watch health data (you can easily find your workout routes in GPX format in the exported zip).
 
 
-### Notes for myself or users who store their data under my github account:
+## Notes for myself or users who store their data under my github account:
 Managing data for people who don't use github (their data will be hosted under my account)
 
 1. Create private repo, say, named "data_tom". Then create fine-grained token to access this data repo (under Developer Settings -> Personal access tokens (Fine-grained tokens) -> Generate new token -> Token name, appropriate expiration time -> only selected repo -> select that private data repo for user -> Add permissions -> contents -> read and write -> done -> send that token to user)
