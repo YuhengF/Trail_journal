@@ -1541,7 +1541,7 @@ const SYNC_CONFIG_KEY = 'trail_journal_sync';
 const TOMBSTONE_KEY = 'trail_journal_tombstones';
 let trails = [];
 let editingId = null, selectedId = null, currentRating = 0, gpxTrackData = null, gpxSpeedData = null, gpxTimesData = null, gpxElevData = null;
-let batchQueue = [], batchCurrentIdx = -1;
+let batchQueue = [], batchCurrentIdx = -1, batchLastSavedTags = '';
 let trailsVisible = true, focusedTrailId = null, savedMapView = null;
 let syncPending = false;
 let ghSha = null;
@@ -3317,7 +3317,7 @@ document.querySelectorAll('.map-controls button[data-layer]').forEach(btn => {
 // ===== MODAL =====
 function openAddModal() {
   editingId = null; gpxTrackData = null; gpxSpeedData = null; gpxTimesData = null; gpxElevData = null;
-  batchQueue = []; batchCurrentIdx = -1;
+  batchQueue = []; batchCurrentIdx = -1; batchLastSavedTags = '';
   clearGpxPreview();
   document.getElementById('batchQueue').innerHTML = '';
   document.getElementById('modalTitle').textContent = 'Add Trail';
@@ -3336,7 +3336,7 @@ function openAddModal() {
 function openEditModal(id) {
   const t = trails.find(x => x.id===id); if (!t) return;
   editingId = id; gpxTrackData = t.coords || null; gpxSpeedData = t.speedData || null; gpxTimesData = t.gpxTimes || null; gpxElevData = t.gpxElevations || null;
-  batchQueue = []; batchCurrentIdx = -1;
+  batchQueue = []; batchCurrentIdx = -1; batchLastSavedTags = '';
   document.getElementById('batchQueue').innerHTML = '';
   document.getElementById('modalTitle').textContent = 'Edit Trail';
   document.getElementById('saveBtn').textContent = 'Update Trail';
@@ -3367,7 +3367,7 @@ function openEditModal(id) {
 function closeModal(e) {
   if (e && e.target !== e.currentTarget) return;
   document.getElementById('modalOverlay').classList.remove('open');
-  batchQueue = []; batchCurrentIdx = -1;
+  batchQueue = []; batchCurrentIdx = -1; batchLastSavedTags = '';
   clearGpxPreview();
   if (window.innerWidth <= 800) switchMobileTab('list');
 }
@@ -3420,6 +3420,7 @@ async function saveTrail() {
   if (batchQueue.length > 0 && batchCurrentIdx >= 0) {
     batchQueue[batchCurrentIdx].saved = true;
     batchQueue[batchCurrentIdx].savedTrailId = trail.id;
+    batchLastSavedTags = document.getElementById('fTags').value;
     renderList(); renderMap();
     const nextIdx = batchQueue.findIndex((b, i) => i > batchCurrentIdx && !b.saved);
     const fallbackIdx = batchQueue.findIndex(b => !b.saved);
@@ -3652,6 +3653,8 @@ function finalizeBatchLoad() {
 
 function renderBatchQueue() {
   const container = document.getElementById('batchQueue');
+  const oldList = container.querySelector('.batch-queue-list');
+  const prevScroll = oldList ? oldList.scrollTop : 0;
   const savedCount = batchQueue.filter(b => b.saved).length;
   const total = batchQueue.length;
   let h = '<div class="batch-queue">';
@@ -3687,6 +3690,12 @@ function renderBatchQueue() {
   }
   h += '</div>';
   container.innerHTML = h;
+  const newList = container.querySelector('.batch-queue-list');
+  if (newList) {
+    newList.scrollTop = prevScroll;
+    const activeEl = newList.querySelector('.batch-queue-item.active');
+    if (activeEl) activeEl.scrollIntoView({ block: 'nearest' });
+  }
 }
 
 function selectBatchItem(idx) {
@@ -3709,7 +3718,13 @@ function selectBatchItem(idx) {
   document.getElementById('fDuration').value = fs.duration || '';
   document.getElementById('fDifficulty').value = fs.difficulty || '';
   setStars(fs.rating || 0);
-  document.getElementById('fTags').value = fs.tags || '';
+  if (!item.formTouched && batchLastSavedTags) {
+    document.getElementById('fTags').value = batchLastSavedTags;
+    item.formState.tags = batchLastSavedTags;
+  } else {
+    document.getElementById('fTags').value = fs.tags || '';
+  }
+  item.formTouched = true;
   document.getElementById('fWeather').value = fs.weather || '';
   document.getElementById('fCompanions').value = fs.companions || '';
   document.getElementById('fNotes').value = fs.notes || '';
@@ -3717,6 +3732,7 @@ function selectBatchItem(idx) {
   clearFormPhotos();
   renderBatchQueue();
   updateBatchSaveButton();
+  renderModalTagPicker();
   showGpxPreview(item.gpxData.trackData);
 }
 
@@ -3787,7 +3803,7 @@ function clearBatchQueue() {
     trails = trails.filter(t => !savedIds.includes(t.id));
     saveData(); renderList(); renderMap();
   }
-  batchQueue = []; batchCurrentIdx = -1;
+  batchQueue = []; batchCurrentIdx = -1; batchLastSavedTags = '';
   document.getElementById('batchQueue').innerHTML = '';
   const gpxDrop = document.getElementById('gpxDrop');
   gpxDrop.style.display = '';
