@@ -1193,7 +1193,7 @@ img.leaflet-tile { image-rendering: auto; }
       </div>
       <div class="form-group"><label>Trail Name *</label><input type="text" id="fName" placeholder="e.g. Mission Peak Loop"></div>
       <div class="form-row">
-        <div class="form-group"><label>Date</label><input type="text" id="fDate" placeholder="YYYY-MM-DD" onfocus="this.type='date'" onblur="if(!this.value)this.type='text'"></div>
+        <div class="form-group"><label>Date</label><input type="text" id="fDate" placeholder="YYYY-MM-DD" onfocus="this.type='date'" onblur="this.type='text'"></div>
         <div class="form-group"><label>Status</label><select id="fStatus"><option value="completed">Completed</option><option value="wishlist">Wishlist</option></select></div>
       </div>
       <div class="form-row">
@@ -2599,7 +2599,7 @@ function openAddModal() {
   document.getElementById('modalTitle').textContent = 'Add Trail';
   document.getElementById('saveBtn').textContent = 'Save Trail';
   clearForm();
-  const fd = document.getElementById('fDate'); fd.type = 'date'; fd.value = new Date().toISOString().split('T')[0];
+  const fd = document.getElementById('fDate'); fd.value = new Date().toISOString().split('T')[0];
   document.getElementById('modalOverlay').classList.add('open');
   document.getElementById('gpxDrop').innerHTML = `<div>📂 Drop a GPX file here or click to import</div><div style="font-size:10px;margin-top:4px;color:var(--text-muted)">Auto-fills track, distance & elevation</div><input type="file" id="gpxFile" accept=".gpx">`;
   bindGpxInput();
@@ -2613,7 +2613,7 @@ function openEditModal(id) {
   document.getElementById('modalTitle').textContent = 'Edit Trail';
   document.getElementById('saveBtn').textContent = 'Update Trail';
   document.getElementById('fName').value = t.name||'';
-  const fd2 = document.getElementById('fDate'); if(t.date){fd2.type='date';fd2.value=t.date;}else{fd2.type='text';fd2.value='';}
+  const fd2 = document.getElementById('fDate'); fd2.type='text'; fd2.value=t.date||'';
   document.getElementById('fStatus').value = t.status||'completed';
   document.getElementById('fDistance').value = t.distance||'';
   document.getElementById('fElevation').value = t.elevation||'';
@@ -2705,7 +2705,6 @@ function gpxAutoFill(fieldId, value, overrideDefault) {
   const el = document.getElementById(fieldId);
   if (!el) return false;
   if (el.value && el.value.trim() && !overrideDefault) return false;
-  if (el.type === 'text' && fieldId === 'fDate') { el.type = 'date'; }
   el.value = value;
   const group = el.closest('.form-group');
   if (group) {
@@ -2885,7 +2884,7 @@ function restoreFormState() {
   const s = drawSavedFormState;
   editingId = s.editing;
   document.getElementById('fName').value = s.name;
-  const fd = document.getElementById('fDate'); fd.type = s.dateType; fd.value = s.date;
+  const fd = document.getElementById('fDate'); fd.type = 'text'; fd.value = s.date;
   document.getElementById('fStatus').value = s.status;
   document.getElementById('fDistance').value = s.distance;
   document.getElementById('fElevation').value = s.elevation;
