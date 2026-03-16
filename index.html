@@ -4682,6 +4682,11 @@ function toggleMobileTab(tab) {
   const current = document.querySelector('.mobile-tab.active');
   if (current && current.dataset.tab === tab) {
     if (tab === 'map') {
+      // If detail panel is open, close it instead of zooming out
+      if (document.getElementById('detailPanel').classList.contains('open')) {
+        closeDetail();
+        return;
+      }
       // Already on map — zoom out to fit all trails instead of opening sidebar
       if (savedMapView) { map.setView(savedMapView.center, savedMapView.zoom); savedMapView = null; }
       else {
