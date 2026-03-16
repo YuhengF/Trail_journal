@@ -4432,7 +4432,7 @@ function renderInboxStatus() {
 
   inboxGpxFiles.forEach(file => {
     let statusClass, statusLabel;
-    if (skip && inboxProcessedNames.has(file.name)) {
+    if (skip && isInProcessed(file.name)) {
       statusClass = 'inbox-status-skipped';
       statusLabel = 'processed';
     } else {
@@ -4457,6 +4457,17 @@ function renderInboxStatus() {
 
 function escapeHtml(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function stripExt(name) { return name.replace(/\.[^.]+$/, ''); }
+
+function isInProcessed(fileName) {
+  if (inboxProcessedNames.has(fileName)) return true;
+  const base = stripExt(fileName);
+  for (const p of inboxProcessedNames) {
+    if (p === base || stripExt(p) === base) return true;
+  }
+  return false;
 }
 
 function isContentDuplicate(distance, dateStr) {
