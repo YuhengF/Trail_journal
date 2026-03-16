@@ -4668,11 +4668,25 @@ function updateInboxStatus() {
 // ===== POPULAR TRAILS =====
 let popularFiles = [];
 
-function openPopularModal() {
+// Derive the app's own GitHub user/repo from the GitHub Pages URL.
+// GitHub Pages: https://{user}.github.io/{repo}/
+// Falls back to sync config if not on GitHub Pages.
+function getAppRepo() {
+  const host = window.location.hostname;
+  const ghPagesMatch = host.match(/^([^.]+)\.github\.io$/i);
+  if (ghPagesMatch) {
+    const user = ghPagesMatch[1];
+    const repo = window.location.pathname.split('/').filter(Boolean)[0] || '';
+    if (repo) return { user, repo };
+  }
+  // Fallback: use sync config repo (same repo hosts both app and data)
   const cfg = getSyncConfig();
-  if (!cfg) { alert('Please configure GitHub sync first (⚙ Sync button).'); return; }
+  return cfg ? { user: cfg.user, repo: cfg.repo } : null;
+}
+
+function openPopularModal() {
   document.getElementById('popularOverlay').classList.add('open');
-  loadPopularFiles(cfg);
+  loadPopularFiles();
 }
 
 function closePopularModal(e) {
@@ -4680,12 +4694,23 @@ function closePopularModal(e) {
   document.getElementById('popularOverlay').classList.remove('open');
 }
 
-async function loadPopularFiles(cfg) {
+async function loadPopularFiles() {
   const body = document.getElementById('popularModalBody');
   body.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted)">Loading...</div>';
   try {
-    const files = await listGitHubFolder(cfg, 'popular_trails_california');
-    popularFiles = files.filter(f => f.type === 'file' && !f.name.startsWith('.'));
+    const appRepo = getAppRepo();
+    if (!appRepo) throw new Error('Cannot determine app repository. Please configure GitHub sync first.');
+    const token = (getSyncConfig() || {}).token || '';
+    const headers = { 'Accept': 'application/vnd.github.v3+json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(
+      `https://api.github.com/repos/${appRepo.user}/${appRepo.repo}/contents/popular_trails_california`,
+      { headers, cache: 'no-store' }
+    );
+    if (res.status === 404) { popularFiles = []; renderPopularList(); return; }
+    if (!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const data = await res.json();
+    popularFiles = (Array.isArray(data) ? data : []).filter(f => f.type === 'file' && !f.name.startsWith('.'));
     renderPopularList();
   } catch(err) {
     body.innerHTML = `<div style="text-align:center;padding:24px;color:#c0392b">Failed to load: ${escapeHtml(err.message)}</div>`;
@@ -4740,12 +4765,15 @@ function toggleSelectAllPopular(checked) {
 }
 
 async function loadPopularToQueue() {
-  const cfg = getSyncConfig();
-  if (!cfg) return;
+  const appRepo = getAppRepo();
+  if (!appRepo) return;
   const selected = [...document.querySelectorAll('.popular-file-check')].filter(c => c.checked);
   if (!selected.length) return;
   const btn = document.getElementById('popularLoadBtn');
   btn.disabled = true;
+  const token = (getSyncConfig() || {}).token || '';
+  const headers = { 'Accept': 'application/vnd.github.v3+json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
   const items = [];
   let fetched = 0;
   for (const check of selected) {
@@ -4753,8 +4781,8 @@ async function loadPopularToQueue() {
     btn.textContent = `Loading... ${fetched + 1}/${selected.length}`;
     try {
       const res = await fetch(
-        `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/popular_trails_california/${encodeURIComponent(file.name)}`,
-        { headers: { 'Authorization': `Bearer ${cfg.token}`, 'Accept': 'application/vnd.github.v3+json' }, cache: 'no-store' }
+        `https://api.github.com/repos/${appRepo.user}/${appRepo.repo}/contents/popular_trails_california/${encodeURIComponent(file.name)}`,
+        { headers, cache: 'no-store' }
       );
       if (!res.ok) { fetched++; continue; }
       const meta = await res.json();
