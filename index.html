@@ -5303,7 +5303,9 @@ openPhotoDB().catch(e => console.warn('IndexedDB init failed:', e));
 loadTrails(); initMap();
 map.on('click', (e) => {
   if (drawMode) return;
-  if (focusedTrailId && !document.getElementById('detailPanel').classList.contains('open')) {
+  if (document.getElementById('detailPanel').classList.contains('open')) {
+    closeDetail();
+  } else if (focusedTrailId) {
     focusedTrailId = null;
     selectedId = null;
     resetMapHighlight();
