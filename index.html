@@ -948,7 +948,7 @@ img.leaflet-tile { image-rendering: auto; }
   .sidebar-actions { display: none; }
   .data-bar { padding: 6px 12px; }
   .data-bar .btn { font-size: 11px; padding: 7px 6px; }
-  .sync-bar { padding: 3px 12px; font-size: 10px; border-top: none; }
+  .sync-bar { padding: 3px 12px; font-size: 10px; }
 
   /* COMPACT HEADER */
   .sidebar-header { padding: 8px 14px 6px; }
@@ -5065,7 +5065,7 @@ function closeDetail() {
   document.getElementById('detailPanel').classList.remove('open');
   selectedId = null; focusedTrailId = null;
   map.closePopup(); resetMapHighlight(); renderList();
-  if (savedMapView) { map.setView(savedMapView.center, savedMapView.zoom); savedMapView = null; }
+  savedMapView = null; // Keep map where it is (on the trail), don't jump back to previous view
 }
 function editTrail() {
   const id = selectedId;
