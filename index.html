@@ -1390,7 +1390,7 @@ img.leaflet-tile { image-rendering: auto; }
         <span class="sync-dot" id="syncDot"></span>
         <span class="sync-text" id="syncText">Local only</span>
       </div>
-      <div id="inboxStatusBar" style="flex:1;display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;border-left:1px solid var(--border);" onclick="openInboxModal()" title="Click to open inbox">
+      <div id="inboxStatusBar" style="flex:1;display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:default;border-left:1px solid var(--border);" title="Inbox status">
         <span class="sync-dot" id="inboxStatusDot"></span>
         <span class="sync-text" id="inboxStatusText">Inbox</span>
       </div>
@@ -4656,12 +4656,15 @@ function updateInboxStatus() {
   const dot = document.getElementById('inboxStatusDot');
   const text = document.getElementById('inboxStatusText');
   if (!dot || !text) return;
+  const bar = document.getElementById('inboxStatusBar');
   if (inboxNewCount > 0) {
     dot.className = 'sync-dot error';
     text.textContent = `Inbox: ${inboxNewCount} new file${inboxNewCount > 1 ? 's' : ''}`;
+    if (bar) { bar.style.cursor = 'pointer'; bar.onclick = openInboxModal; }
   } else {
     dot.className = 'sync-dot synced';
     text.textContent = 'Inbox: up to date';
+    if (bar) { bar.style.cursor = 'default'; bar.onclick = null; }
   }
 }
 
