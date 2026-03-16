@@ -119,7 +119,7 @@ body {
 .search-box input::placeholder { color: var(--text-muted); }
 
 .filter-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.filter-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.filter-chips { display: flex; gap: 6px; }
 
 .chip {
   font-size: 11px; padding: 4px 10px; border-radius: 20px;
@@ -1041,6 +1041,7 @@ img.leaflet-tile { image-rendering: auto; }
 .sort-btn:hover { border-color: var(--text-muted); background: var(--bg-hover); color: var(--text); }
 .sort-btn.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 500; }
 .sort-btn .sort-arrow { font-size: 12px; opacity: 0.6; }
+.sort-btn .sort-label { display: inline-block; min-width: 11ch; text-align: left; }
 .sort-btn .sort-caret { font-size: 8px; opacity: 0.45; margin-left: 1px; }
 
 .sort-dropdown {
@@ -1305,7 +1306,7 @@ img.leaflet-tile { image-rendering: auto; }
         </div>
         <div class="sort-anchor">
           <button class="sort-btn" id="sortBtn" onclick="toggleSortDropdown(event)">
-            <span class="sort-arrow">⇅</span> Sort: <span id="sortLabel">Date ↓</span> <span class="sort-caret">▾</span>
+            <span class="sort-arrow">⇅</span> Sort: <span id="sortLabel" class="sort-label">Date ↓</span> <span class="sort-caret">▾</span>
           </button>
           <div class="sort-dropdown" id="sortDropdown">
             <button class="sort-option selected" data-sort="date-desc" onclick="setSort('date-desc')"><span class="sort-opt-icon">📅</span> Date<span class="sort-opt-dir">newest first</span></button>
@@ -1375,7 +1376,6 @@ img.leaflet-tile { image-rendering: auto; }
   <div class="map-controls" id="mapControls">
     <button class="active" data-layer="streets">Faded</button>
     <button data-layer="terrain">Terrain</button>
-    <button data-layer="dark">Dark</button>
     <span style="width:1px;background:var(--border);margin:4px 2px;"></span>
     <button class="active" id="trailToggle" onclick="toggleTrailVisibility()">Trails</button>
   </div>
@@ -2862,7 +2862,6 @@ function initMap() {
     attribution: '&copy; Esri &amp; contributors',
     maxZoom: 19
   });
-  tileLayers.dark = L.tileLayer(baseUrl, tileOpts);
   tileLayers.streets.addTo(map);
   currentTileLayer = 'streets';
   Object.values(tileLayers).forEach(layer => {
@@ -2879,7 +2878,6 @@ function switchTileLayer(name) {
   const tp = document.querySelector('.leaflet-tile-pane');
   if (name === 'streets') tp.style.filter = 'saturate(0.3) brightness(1.05) contrast(0.9)';
   else if (name === 'terrain') tp.style.filter = 'none';
-  else if (name === 'dark') tp.style.filter = 'saturate(0.2) brightness(0.55) contrast(1.1) invert(1) hue-rotate(180deg)';
 }
 
 function renderMap() {
