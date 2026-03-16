@@ -5065,7 +5065,7 @@ function closeDetail() {
   document.getElementById('detailPanel').classList.remove('open');
   selectedId = null; focusedTrailId = null;
   map.closePopup(); resetMapHighlight(); renderList();
-  if (savedMapView) { map.setView(savedMapView.center, savedMapView.zoom); savedMapView = null; }
+  savedMapView = null; // Keep map where it is (on the trail), don't jump back to previous view
 }
 function editTrail() {
   const id = selectedId;
