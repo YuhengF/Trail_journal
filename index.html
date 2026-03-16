@@ -5308,7 +5308,6 @@ map.on('click', (e) => {
     selectedId = null;
     resetMapHighlight();
     renderList();
-    if (savedMapView) { map.setView(savedMapView.center, savedMapView.zoom); savedMapView = null; }
   }
 });
 renderList(); renderMap();
