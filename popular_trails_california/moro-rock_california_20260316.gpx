@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1"
+     creator="alltrails-gpx-scraper"
+     xmlns="http://www.topografix.com/GPX/1/1"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://www.topografix.com/GPX/1/1
+       http://www.topografix.com/GPX/1/1/gpx.xsd">
+  <metadata>
+    <name>Moro Rock</name>
+    <time>2026-03-16T08:07:49Z</time>
+  </metadata>
+  <trk>
+    <name>Moro Rock</name>
+    <trkseg>
+    <trkpt lat="36.5468000" lon="-118.7655700"><ele>1968.2</ele></trkpt>
+    <trkpt lat="36.5468000" lon="-118.7655700"><ele>1968.2</ele></trkpt>
+    <trkpt lat="36.5468000" lon="-118.7655700"><ele>1968.2</ele></trkpt>
+    <trkpt lat="36.5466500" lon="-118.7656000"><ele>1971.1</ele></trkpt>
+    <trkpt lat="36.5463400" lon="-118.7655500"><ele>1976.4</ele></trkpt>
+    <trkpt lat="36.5462000" lon="-118.7655700"><ele>1980.3</ele></trkpt>
+    <trkpt lat="36.5459900" lon="-118.7655000"><ele>1985.8</ele></trkpt>
+    <trkpt lat="36.5458900" lon="-118.7654800"><ele>1989.1</ele></trkpt>
+    <trkpt lat="36.5456100" lon="-118.7653800"><ele>1989.2</ele></trkpt>
+    <trkpt lat="36.5455000" lon="-118.7655300"><ele>1988.8</ele></trkpt>
+    <trkpt lat="36.5451200" lon="-118.7654200"><ele>2003.2</ele></trkpt>
+    <trkpt lat="36.5450500" lon="-118.7653200"><ele>2010.2</ele></trkpt>
+    <trkpt lat="36.5449100" lon="-118.7653100"><ele>2021.1</ele></trkpt>
+    <trkpt lat="36.5450100" lon="-118.7654800"><ele>2006.7</ele></trkpt>
+    <trkpt lat="36.5449500" lon="-118.7655200"><ele>2002.5</ele></trkpt>
+    <trkpt lat="36.5446700" lon="-118.7652900"><ele>2026.5</ele></trkpt>
+    <trkpt lat="36.5446800" lon="-118.7652400"><ele>2031.3</ele></trkpt>
+    <trkpt lat="36.5445300" lon="-118.7651700"><ele>2036.0</ele></trkpt>
+    <trkpt lat="36.5445400" lon="-118.7652300"><ele>2028.4</ele></trkpt>
+    <trkpt lat="36.5442800" lon="-118.7651200"><ele>2019.7</ele></trkpt>
+    <trkpt lat="36.5442700" lon="-118.7651600"><ele>2004.5</ele></trkpt>
+    <trkpt lat="36.5441400" lon="-118.7651000"><ele>2002.5</ele></trkpt>
+    <trkpt lat="36.5442700" lon="-118.7651600"><ele>2004.5</ele></trkpt>
+    <trkpt lat="36.5442800" lon="-118.7651200"><ele>2019.7</ele></trkpt>
+    <trkpt lat="36.5445400" lon="-118.7652300"><ele>2028.4</ele></trkpt>
+    <trkpt lat="36.5445300" lon="-118.7651700"><ele>2036.0</ele></trkpt>
+    <trkpt lat="36.5446800" lon="-118.7652400"><ele>2031.3</ele></trkpt>
+    <trkpt lat="36.5446700" lon="-118.7652900"><ele>2026.5</ele></trkpt>
+    <trkpt lat="36.5449500" lon="-118.7655200"><ele>2002.5</ele></trkpt>
+    <trkpt lat="36.5450100" lon="-118.7654800"><ele>2006.7</ele></trkpt>
+    <trkpt lat="36.5449100" lon="-118.7653100"><ele>2021.1</ele></trkpt>
+    <trkpt lat="36.5450500" lon="-118.7653200"><ele>2010.2</ele></trkpt>
+    <trkpt lat="36.5451200" lon="-118.7654200"><ele>2003.2</ele></trkpt>
+    <trkpt lat="36.5455000" lon="-118.7655300"><ele>1988.8</ele></trkpt>
+    <trkpt lat="36.5456100" lon="-118.7653800"><ele>1989.2</ele></trkpt>
+    <trkpt lat="36.5458900" lon="-118.7654800"><ele>1989.1</ele></trkpt>
+    <trkpt lat="36.5459900" lon="-118.7655000"><ele>1985.8</ele></trkpt>
+    <trkpt lat="36.5462000" lon="-118.7655700"><ele>1980.3</ele></trkpt>
+    <trkpt lat="36.5463400" lon="-118.7655500"><ele>1976.4</ele></trkpt>
+    <trkpt lat="36.5466500" lon="-118.7656000"><ele>1971.1</ele></trkpt>
+    <trkpt lat="36.5468000" lon="-118.7655700"><ele>1968.2</ele></trkpt>
+    <trkpt lat="36.5468000" lon="-118.7655700"><ele>1968.2</ele></trkpt>
+    <trkpt lat="36.5468000" lon="-118.7655700"><ele>1968.2</ele></trkpt>
+    </trkseg>
+  </trk>
+</gpx>
