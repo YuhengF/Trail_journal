@@ -2994,7 +2994,7 @@ function renderMap() {
     const hitArea = L.polyline(t.coords, { color: 'transparent', weight: 30, opacity: 0, smoothFactor: 1, interactive: true });
     const outline = L.polyline(t.coords, { color: '#1a1a1e', weight: 8, opacity: 0.45, smoothFactor: 1, interactive: false });
     if (trailsVisible) { hitArea.addTo(map); outline.addTo(map); }
-    hitArea.on('click', () => onMapTrailClick(t.id));
+    hitArea.on('click', (e) => { L.DomEvent.stopPropagation(e); onMapTrailClick(t.id); });
     const lines = [];
     if (t.speedData && t.speedData.speeds && t.speedData.speeds.length > 0) {
       const { chunkSize, speeds } = t.speedData;
