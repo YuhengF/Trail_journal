@@ -4554,13 +4554,22 @@ async function loadInboxToQueue() {
     return;
   }
 
-  // openAddModal resets batchQueue, so call it first then populate
-  openAddModal();
+  // Set up the add modal manually to avoid openAddModal() resetting batchQueue
+  editingId = null; gpxTrackData = null; gpxSpeedData = null; gpxTimesData = null; gpxElevData = null;
+  batchCurrentIdx = -1; batchLastSavedTags = '';
+  clearGpxPreview();
+  document.getElementById('modalTitle').textContent = 'Add Trail';
+  document.getElementById('saveBtn').textContent = 'Save Trail';
+  clearForm();
+  document.getElementById('fDate').value = toLocalDateStr(new Date());
+  document.getElementById('gpxDrop').style.display = 'none';
+  document.getElementById('batchQueue').innerHTML = '';
+  document.getElementById('modalOverlay').classList.add('open');
+  renderModalTagPicker();
+  if (window.innerWidth <= 800) document.getElementById('sidebar').classList.remove('mobile-visible');
+
   batchQueue = items;
   batchQueue.sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.name || '').localeCompare(b.name || ''));
-  batchCurrentIdx = -1;
-  batchLastSavedTags = '';
-  document.getElementById('gpxDrop').style.display = 'none';
   renderBatchQueue();
   selectBatchItem(0);
   updateBatchSaveButton();
