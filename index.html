@@ -4314,6 +4314,7 @@ async function saveAllBatch() {
 // ===== INBOX CHECK =====
 let inboxGpxFiles = [];
 let inboxProcessedNames = new Set();
+let inboxAllFiles = [];
 
 function openInboxModal() {
   const cfg = getSyncConfig();
@@ -4322,25 +4323,80 @@ function openInboxModal() {
     return;
   }
   document.getElementById('inboxOverlay').classList.add('open');
-  document.getElementById('inboxModalBody').innerHTML =
-    '<div style="text-align:center;padding:32px;color:var(--text-muted)">Loading inbox...</div>';
+  renderInboxLoading(cfg);
+}
 
-  Promise.all([
-    listGitHubFolder(cfg, 'inbox'),
-    listGitHubFolder(cfg, 'inbox/processed')
-  ]).then(([inboxFiles, processedFiles]) => {
-    inboxGpxFiles = inboxFiles.filter(f => f.name.toLowerCase().endsWith('.gpx'));
-    inboxProcessedNames = new Set(processedFiles.map(f => f.name));
-    if (!inboxGpxFiles.length) {
-      document.getElementById('inboxModalBody').innerHTML =
-        '<div style="text-align:center;padding:32px;color:var(--text-muted)">No GPX files found in inbox.</div>';
+async function renderInboxLoading(cfg) {
+  const body = document.getElementById('inboxModalBody');
+  // Path input row
+  const savedInboxPath = localStorage.getItem('inbox_path') || 'inbox';
+  body.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+      <label style="font-size:12px;color:var(--text-dim);white-space:nowrap;flex-shrink:0;">Inbox folder path:</label>
+      <input type="text" id="inboxPathInput" value="${escapeHtml(savedInboxPath)}"
+        style="flex:1;font-size:12px;font-family:'JetBrains Mono',monospace;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-input);">
+      <button class="btn" onclick="reloadInbox()" style="flex-shrink:0;padding:5px 10px;font-size:12px;">Refresh</button>
+    </div>
+    <div id="inboxLoadingMsg" style="text-align:center;padding:24px;color:var(--text-muted)">Loading...</div>`;
+  await fetchAndRenderInbox(cfg, savedInboxPath);
+}
+
+async function reloadInbox() {
+  const cfg = getSyncConfig();
+  if (!cfg) return;
+  const path = (document.getElementById('inboxPathInput').value || 'inbox').trim().replace(/\/+$/, '');
+  localStorage.setItem('inbox_path', path);
+  document.getElementById('inboxLoadingMsg').style.cssText = 'text-align:center;padding:24px;color:var(--text-muted)';
+  document.getElementById('inboxLoadingMsg').textContent = 'Loading...';
+  // Clear any old content below the path row
+  const body = document.getElementById('inboxModalBody');
+  const extra = body.querySelectorAll('.inbox-content');
+  extra.forEach(el => el.remove());
+  await fetchAndRenderInbox(cfg, path);
+}
+
+async function fetchAndRenderInbox(cfg, inboxPath) {
+  const msgEl = document.getElementById('inboxLoadingMsg');
+  try {
+    const [allFiles, processedFiles] = await Promise.all([
+      listGitHubFolder(cfg, inboxPath),
+      listGitHubFolder(cfg, inboxPath + '/processed').catch(() => [])
+    ]);
+
+    inboxAllFiles = allFiles;
+    inboxGpxFiles = allFiles.filter(f => f.type === 'file' && f.name.toLowerCase().endsWith('.gpx'));
+    inboxProcessedNames = new Set(processedFiles.filter(f => f.type === 'file').map(f => f.name));
+
+    if (msgEl) msgEl.remove();
+
+    if (allFiles.length === 0) {
+      appendInboxContent(`<div style="text-align:center;padding:24px;color:var(--text-muted)">
+        Folder <code style="font-size:11px;background:var(--bg-input);padding:1px 5px;border-radius:4px;">${escapeHtml(inboxPath)}</code> not found or empty in <strong>${escapeHtml(cfg.repo)}</strong>.
+        <div style="font-size:11px;margin-top:6px;">Check the path above matches your repo structure.</div>
+      </div>`);
       return;
     }
+
+    if (!inboxGpxFiles.length) {
+      const names = allFiles.map(f => escapeHtml(f.name)).join(', ');
+      appendInboxContent(`<div style="padding:16px;color:var(--text-dim);font-size:12px;">
+        No <code>.gpx</code> files in <strong>${escapeHtml(inboxPath)}/</strong>.
+        Found ${allFiles.length} other file(s): <span style="color:var(--text-muted)">${names}</span>
+      </div>`);
+      return;
+    }
+
     renderInboxFileList();
-  }).catch(err => {
-    document.getElementById('inboxModalBody').innerHTML =
-      `<div style="color:#c0392b;padding:16px">Error loading inbox: ${err.message}</div>`;
-  });
+  } catch (err) {
+    if (msgEl) msgEl.innerHTML = `<span style="color:#c0392b">Error: ${escapeHtml(err.message)}</span>`;
+  }
+}
+
+function appendInboxContent(html) {
+  const div = document.createElement('div');
+  div.className = 'inbox-content';
+  div.innerHTML = html;
+  document.getElementById('inboxModalBody').appendChild(div);
 }
 
 async function listGitHubFolder(cfg, path) {
@@ -4349,7 +4405,7 @@ async function listGitHubFolder(cfg, path) {
     { headers: { 'Authorization': `Bearer ${cfg.token}`, 'Accept': 'application/vnd.github.v3+json' }, cache: 'no-store' }
   );
   if (res.status === 404) return [];
-  if (!res.ok) throw new Error(`GitHub API ${res.status} for ${path}`);
+  if (!res.ok) throw new Error(`GitHub API ${res.status} for "${path}"`);
   const data = await res.json();
   return Array.isArray(data) ? data : [];
 }
@@ -4360,18 +4416,19 @@ function closeInboxModal(e) {
 }
 
 function renderInboxFileList() {
-  let h = '';
+  const inboxPath = localStorage.getItem('inbox_path') || 'inbox';
+  let h = '<div class="inbox-content">';
   h += `<div style="margin-bottom:14px;padding:10px 12px;background:var(--bg-input);border:1px solid var(--border-light);border-radius:8px;">`;
   h += `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">`;
   h += `<input type="checkbox" id="inboxSkipExisting" checked onchange="renderInboxStatus()">`;
   h += `<span>Skip existing trails <span style="color:var(--text-muted);font-size:11px;">(already processed or matching a saved trail by date &amp; distance)</span></span>`;
   h += `</label></div>`;
-  h += `<div id="inboxFileList" style="max-height:300px;overflow-y:auto;margin-bottom:14px;border:1px solid var(--border-light);border-radius:8px;"></div>`;
+  h += `<div id="inboxFileList" style="max-height:280px;overflow-y:auto;margin-bottom:14px;border:1px solid var(--border-light);border-radius:8px;"></div>`;
   h += `<div style="display:flex;gap:8px;justify-content:flex-end;">`;
   h += `<button class="btn" onclick="closeInboxModal()">Cancel</button>`;
   h += `<button class="btn primary" id="inboxLoadBtn" onclick="loadInboxToQueue()">Load to Queue</button>`;
-  h += `</div>`;
-  document.getElementById('inboxModalBody').innerHTML = h;
+  h += `</div></div>`;
+  document.getElementById('inboxModalBody').insertAdjacentHTML('beforeend', h);
   renderInboxStatus();
 }
 
@@ -4433,11 +4490,13 @@ async function loadInboxToQueue() {
   const items = [];
   let fetched = 0;
 
+  const inboxPath = (document.getElementById('inboxPathInput')?.value || localStorage.getItem('inbox_path') || 'inbox').trim().replace(/\/+$/, '');
+
   for (const file of filesToFetch) {
     btn.textContent = `Loading... ${fetched + 1}/${filesToFetch.length}`;
     try {
       const res = await fetch(
-        `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/inbox/${encodeURIComponent(file.name)}`,
+        `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${inboxPath}/${encodeURIComponent(file.name)}`,
         { headers: { 'Authorization': `Bearer ${cfg.token}`, 'Accept': 'application/vnd.github.v3+json' }, cache: 'no-store' }
       );
       if (!res.ok) { fetched++; continue; }
@@ -4478,7 +4537,7 @@ async function loadInboxToQueue() {
           elevData: (r.elevations && r.elevations.length === r.coords.length) ? r.elevations : null
         },
         saved: false,
-        inboxFile: { name: file.name, sha: meta.sha, content: base64 }
+        inboxFile: { name: file.name, sha: meta.sha, content: base64, inboxPath }
       });
     } catch { /* skip failed files */ }
     fetched++;
@@ -4506,30 +4565,23 @@ async function loadInboxToQueue() {
 async function archiveInboxFile(inboxFile) {
   const cfg = getSyncConfig();
   if (!cfg || !inboxFile) return;
+  const base = inboxFile.inboxPath || localStorage.getItem('inbox_path') || 'inbox';
   try {
-    // Step 1: copy to inbox/processed/
+    // Step 1: copy to {inbox}/processed/
     await fetch(
-      `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/inbox/processed/${encodeURIComponent(inboxFile.name)}`,
+      `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${base}/processed/${encodeURIComponent(inboxFile.name)}`,
       {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${cfg.token}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Authorization': `Bearer ${cfg.token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: `Archive processed GPX: ${inboxFile.name}`, content: inboxFile.content })
       }
     );
-    // Step 2: delete from inbox/
+    // Step 2: delete from {inbox}/
     await fetch(
-      `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/inbox/${encodeURIComponent(inboxFile.name)}`,
+      `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${base}/${encodeURIComponent(inboxFile.name)}`,
       {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${cfg.token}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Authorization': `Bearer ${cfg.token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: `Remove from inbox after processing: ${inboxFile.name}`, sha: inboxFile.sha })
       }
     );
