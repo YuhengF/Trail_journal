@@ -1381,12 +1381,17 @@ img.leaflet-tile { image-rendering: auto; }
       <button class="btn" onclick="document.getElementById('importJson').click()">↑ Import</button>
       <input type="file" id="importJson" accept=".json" style="display:none" onchange="importData(event)">
       <button class="btn" onclick="openSettings()" title="Sync settings">⚙ Sync</button>
-      <button class="btn" onclick="openInboxModal()" title="Import GPX files from GitHub inbox folder">↓ Inbox</button>
+      <button class="btn" id="inboxBtn" onclick="openInboxModal()" title="Import GPX files from GitHub inbox folder">↓ Inbox</button>
+      <button class="btn" id="popularBtn" onclick="openPopularModal()" title="Browse popular trails">★ Popular</button>
     </div>
 
     <div class="sync-bar" id="syncBar">
       <span class="sync-dot" id="syncDot"></span>
       <span class="sync-text" id="syncText">Local only</span>
+    </div>
+    <div class="sync-bar" id="inboxStatusBar" style="display:none;cursor:pointer;" onclick="openInboxModal()" title="Click to open inbox">
+      <span class="sync-dot" id="inboxStatusDot"></span>
+      <span class="sync-text" id="inboxStatusText"></span>
     </div>
 
     <div class="token-banner" id="tokenBanner">
@@ -1669,6 +1674,16 @@ img.leaflet-tile { image-rendering: auto; }
       <button class="modal-close" onclick="closeInboxModal()">×</button>
     </div>
     <div class="modal-body" id="inboxModalBody"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="popularOverlay" onclick="closePopularModal(event)">
+  <div class="modal" onclick="event.stopPropagation()" style="width:520px">
+    <div class="modal-header">
+      <h2>Popular Trails</h2>
+      <button class="modal-close" onclick="closePopularModal()">×</button>
+    </div>
+    <div class="modal-body" id="popularModalBody"></div>
   </div>
 </div>
 
@@ -4336,31 +4351,21 @@ function openInboxModal() {
 
 async function renderInboxLoading(cfg) {
   const body = document.getElementById('inboxModalBody');
-  // Path input row
-  const savedInboxPath = localStorage.getItem('inbox_path') || 'inbox';
   body.innerHTML = `
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
-      <label style="font-size:12px;color:var(--text-dim);white-space:nowrap;flex-shrink:0;">Inbox folder path:</label>
-      <input type="text" id="inboxPathInput" value="${escapeHtml(savedInboxPath)}"
-        style="flex:1;font-size:12px;font-family:'JetBrains Mono',monospace;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-input);">
-      <button class="btn" onclick="reloadInbox()" style="flex-shrink:0;padding:5px 10px;font-size:12px;">Refresh</button>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+      <button class="btn" onclick="reloadInbox()" style="padding:5px 10px;font-size:12px;">Refresh</button>
     </div>
     <div id="inboxLoadingMsg" style="text-align:center;padding:24px;color:var(--text-muted)">Loading...</div>`;
-  await fetchAndRenderInbox(cfg, savedInboxPath);
+  await fetchAndRenderInbox(cfg, 'inbox');
 }
 
 async function reloadInbox() {
   const cfg = getSyncConfig();
   if (!cfg) return;
-  const path = (document.getElementById('inboxPathInput').value || 'inbox').trim().replace(/\/+$/, '');
-  localStorage.setItem('inbox_path', path);
   document.getElementById('inboxLoadingMsg').style.cssText = 'text-align:center;padding:24px;color:var(--text-muted)';
   document.getElementById('inboxLoadingMsg').textContent = 'Loading...';
-  // Clear any old content below the path row
-  const body = document.getElementById('inboxModalBody');
-  const extra = body.querySelectorAll('.inbox-content');
-  extra.forEach(el => el.remove());
-  await fetchAndRenderInbox(cfg, path);
+  document.getElementById('inboxModalBody').querySelectorAll('.inbox-content').forEach(el => el.remove());
+  await fetchAndRenderInbox(cfg, 'inbox');
 }
 
 async function fetchAndRenderInbox(cfg, inboxPath) {
@@ -4414,10 +4419,11 @@ async function listGitHubFolder(cfg, path) {
 function closeInboxModal(e) {
   if (e && e.target !== e.currentTarget) return;
   document.getElementById('inboxOverlay').classList.remove('open');
+  refreshInboxBadge();
 }
 
 function renderInboxFileList() {
-  const inboxPath = localStorage.getItem('inbox_path') || 'inbox';
+  const inboxPath = 'inbox';
   let h = '<div class="inbox-content">';
   h += `<div style="margin-bottom:14px;padding:10px 12px;background:var(--bg-input);border:1px solid var(--border-light);border-radius:8px;">`;
   h += `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">`;
@@ -4511,7 +4517,7 @@ async function loadInboxToQueue() {
   const items = [];
   let fetched = 0;
 
-  const inboxPath = (document.getElementById('inboxPathInput')?.value || localStorage.getItem('inbox_path') || 'inbox').trim().replace(/\/+$/, '');
+  const inboxPath = 'inbox';
 
   for (const file of filesToFetch) {
     btn.textContent = `Loading... ${fetched + 1}/${filesToFetch.length}`;
@@ -4593,7 +4599,7 @@ async function loadInboxToQueue() {
 async function archiveInboxFile(inboxFile) {
   const cfg = getSyncConfig();
   if (!cfg || !inboxFile) return;
-  const base = inboxFile.inboxPath || localStorage.getItem('inbox_path') || 'inbox';
+  const base = 'inbox';
   try {
     // Step 1: copy to {inbox}/processed/
     await fetch(
@@ -4616,6 +4622,196 @@ async function archiveInboxFile(inboxFile) {
   } catch (err) {
     console.warn('archiveInboxFile failed for', inboxFile.name, err);
   }
+}
+
+// ===== INBOX BADGE / STATUS BAR =====
+let inboxNewCount = -1; // -1 = not yet checked
+
+async function refreshInboxBadge() {
+  const cfg = getSyncConfig();
+  if (!cfg) return;
+  try {
+    const [allFiles, processedFiles] = await Promise.all([
+      listGitHubFolder(cfg, 'inbox'),
+      listGitHubFolder(cfg, 'inbox/processed').catch(() => [])
+    ]);
+    const processed = new Set(processedFiles.filter(f => f.type === 'file').map(f => f.name));
+    inboxNewCount = allFiles.filter(f => f.type === 'file' && !f.name.startsWith('.') && !processed.has(f.name)).length;
+    updateInboxStatus();
+  } catch { /* silently ignore */ }
+}
+
+function updateInboxStatus() {
+  if (inboxNewCount < 0) return;
+  // Button badge
+  const btn = document.getElementById('inboxBtn');
+  if (btn) {
+    btn.innerHTML = inboxNewCount > 0
+      ? `↓ Inbox <span style="background:#e74c3c;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;vertical-align:middle;">${inboxNewCount}</span>`
+      : '↓ Inbox';
+  }
+  // Status bar
+  const bar = document.getElementById('inboxStatusBar');
+  const dot = document.getElementById('inboxStatusDot');
+  const text = document.getElementById('inboxStatusText');
+  if (!bar || !dot || !text) return;
+  if (inboxNewCount > 0) {
+    bar.style.display = 'flex';
+    dot.className = 'sync-dot error'; // red dot
+    text.textContent = `Inbox: ${inboxNewCount} new file${inboxNewCount > 1 ? 's' : ''} — click to import`;
+  } else {
+    bar.style.display = 'flex';
+    dot.className = 'sync-dot synced';
+    text.textContent = 'Inbox: up to date';
+  }
+}
+
+// ===== POPULAR TRAILS =====
+let popularFiles = [];
+
+function openPopularModal() {
+  const cfg = getSyncConfig();
+  if (!cfg) { alert('Please configure GitHub sync first (⚙ Sync button).'); return; }
+  document.getElementById('popularOverlay').classList.add('open');
+  loadPopularFiles(cfg);
+}
+
+function closePopularModal(e) {
+  if (e && e.target !== e.currentTarget) return;
+  document.getElementById('popularOverlay').classList.remove('open');
+}
+
+async function loadPopularFiles(cfg) {
+  const body = document.getElementById('popularModalBody');
+  body.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted)">Loading...</div>';
+  try {
+    const files = await listGitHubFolder(cfg, 'popular/trails');
+    popularFiles = files.filter(f => f.type === 'file' && !f.name.startsWith('.'));
+    renderPopularList();
+  } catch(err) {
+    body.innerHTML = `<div style="text-align:center;padding:24px;color:#c0392b">Failed to load: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function renderPopularList() {
+  const body = document.getElementById('popularModalBody');
+  if (!popularFiles.length) {
+    body.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted)">No trails found in popular/trails/</div>';
+    return;
+  }
+  let h = '<div class="inbox-content">';
+  h += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">`;
+  h += `<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;color:var(--text-muted);">`;
+  h += `<input type="checkbox" id="popularSelectAll" onchange="toggleSelectAllPopular(this.checked)"> Select all`;
+  h += `</label>`;
+  h += `<span id="popularSelectedCount" style="font-size:12px;color:var(--text-muted);">0 selected</span>`;
+  h += `</div>`;
+  h += `<div style="max-height:300px;overflow-y:auto;margin-bottom:12px;border:1px solid var(--border-light);border-radius:8px;">`;
+  popularFiles.forEach((file, i) => {
+    h += `<label class="inbox-file-item" style="cursor:pointer;gap:10px;">`;
+    h += `<input type="checkbox" class="popular-file-check" data-idx="${i}" onchange="updatePopularCount()">`;
+    h += `<span class="inbox-file-name" style="flex:1;">${escapeHtml(gpxFileBaseName(file.name))}</span>`;
+    h += `</label>`;
+  });
+  h += `</div>`;
+  h += `<div style="font-size:11px;color:var(--text-muted);margin-bottom:12px;">Will be added with <strong>wishlist</strong> status and tag — you can edit before saving.</div>`;
+  h += `<div style="display:flex;gap:8px;justify-content:flex-end;">`;
+  h += `<button class="btn" onclick="closePopularModal()">Cancel</button>`;
+  h += `<button class="btn primary" id="popularLoadBtn" onclick="loadPopularToQueue()" disabled>Load Selected</button>`;
+  h += `</div></div>`;
+  body.innerHTML = h;
+}
+
+function updatePopularCount() {
+  const checks = [...document.querySelectorAll('.popular-file-check')];
+  const n = checks.filter(c => c.checked).length;
+  document.getElementById('popularSelectedCount').textContent = `${n} selected`;
+  const btn = document.getElementById('popularLoadBtn');
+  if (btn) { btn.disabled = n === 0; btn.textContent = n > 0 ? `Load ${n} to Queue` : 'Load Selected'; }
+  const all = document.getElementById('popularSelectAll');
+  if (all) {
+    all.checked = n === checks.length && n > 0;
+    all.indeterminate = n > 0 && n < checks.length;
+  }
+}
+
+function toggleSelectAllPopular(checked) {
+  document.querySelectorAll('.popular-file-check').forEach(c => c.checked = checked);
+  updatePopularCount();
+}
+
+async function loadPopularToQueue() {
+  const cfg = getSyncConfig();
+  if (!cfg) return;
+  const selected = [...document.querySelectorAll('.popular-file-check')].filter(c => c.checked);
+  if (!selected.length) return;
+  const btn = document.getElementById('popularLoadBtn');
+  btn.disabled = true;
+  const items = [];
+  let fetched = 0;
+  for (const check of selected) {
+    const file = popularFiles[parseInt(check.dataset.idx)];
+    btn.textContent = `Loading... ${fetched + 1}/${selected.length}`;
+    try {
+      const res = await fetch(
+        `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/popular/trails/${encodeURIComponent(file.name)}`,
+        { headers: { 'Authorization': `Bearer ${cfg.token}`, 'Accept': 'application/vnd.github.v3+json' }, cache: 'no-store' }
+      );
+      if (!res.ok) { fetched++; continue; }
+      const meta = await res.json();
+      const xmlStr = decodeURIComponent(escape(atob(meta.content.replace(/\s/g, ''))));
+      let r;
+      try { r = parseGPX(xmlStr); } catch { fetched++; continue; }
+      const trailName = r.name || gpxFileBaseName(file.name);
+      let trailDateStr = null;
+      if (r.startDate && !isNaN(r.startDate.getTime())) trailDateStr = toLocalDateStr(r.startDate);
+      if (!trailDateStr) {
+        const m = file.name.match(/(\d{4}-\d{2}-\d{2})/);
+        trailDateStr = m ? m[1] : toLocalDateStr(new Date());
+      }
+      if (isContentDuplicate(r.startDate, r.distance, trailDateStr)) { fetched++; continue; }
+      items.push({
+        parsed: r, name: trailName, date: trailDateStr,
+        formState: {
+          name: trailName, date: trailDateStr, status: 'wishlist',
+          distance: r.distance || '', elevation: r.elevation || '',
+          duration: r.duration || '', difficulty: '', rating: 0,
+          tags: 'wishlist', weather: '', companions: '', notes: '',
+          coords: r.coords ? JSON.stringify(r.coords) : ''
+        },
+        gpxData: {
+          trackData: r.coords, speedData: r.speedData || null,
+          timesData: r.times || null,
+          elevData: (r.elevations && r.elevations.length === r.coords.length) ? r.elevations : null
+        },
+        saved: false
+      });
+    } catch { /* skip */ }
+    fetched++;
+  }
+  closePopularModal();
+  if (!items.length) {
+    alert('All selected trails already exist in your list.');
+    return;
+  }
+  // Open add modal (same pattern as loadInboxToQueue)
+  editingId = null; gpxTrackData = null; gpxSpeedData = null; gpxTimesData = null; gpxElevData = null;
+  batchCurrentIdx = -1; batchLastSavedTags = '';
+  clearGpxPreview();
+  document.getElementById('modalTitle').textContent = 'Add Trail';
+  document.getElementById('saveBtn').textContent = 'Save Trail';
+  clearForm();
+  document.getElementById('fDate').value = toLocalDateStr(new Date());
+  document.getElementById('gpxDrop').style.display = 'none';
+  document.getElementById('batchQueue').innerHTML = '';
+  document.getElementById('modalOverlay').classList.add('open');
+  renderModalTagPicker();
+  if (window.innerWidth <= 800) document.getElementById('sidebar').classList.remove('mobile-visible');
+  batchQueue = items;
+  batchQueue.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  renderBatchQueue();
+  selectBatchItem(0);
+  updateBatchSaveButton();
 }
 
 // ===== DRAW ON MAP =====
@@ -5111,6 +5307,8 @@ document.getElementById('fTags').addEventListener('input', renderModalTagPicker)
 
 // Pull from GitHub on load (non-blocking)
 syncFromGitHub();
+// Check inbox for new files (non-blocking, updates badge + status bar)
+refreshInboxBadge();
 </script>
 </body>
 </html>
