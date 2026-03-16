@@ -3952,8 +3952,7 @@ function handleGPXFile(file) {
       gpxTimesData = r.times || null;
       gpxElevData = (r.elevations && r.elevations.length === r.coords.length) ? r.elevations : null;
 
-      const fileBaseName = fileName.replace(/[-_\s]+\d{4}-\d{2}-\d{2}[\sT_]\d{2}[:\-]\d{2}[:\-]\d{2}\S*$/, '').trim() || fileName;
-      const trailName = r.name || fileBaseName;
+      const trailName = r.name || gpxFileBaseName(fileName);
       gpxAutoFill('fName', trailName);
 
       // Date: GPS trkpt timestamps (first) > filename regex > file.lastModified
@@ -3999,8 +3998,7 @@ function handleMultipleGPXFiles(files) {
     reader.onload = ev => {
       try {
         const r = parseGPX(ev.target.result);
-        const fileBaseName = fileName.replace(/[-_\s]+\d{4}-\d{2}-\d{2}[\sT_]\d{2}[:\-]\d{2}[:\-]\d{2}\S*$/, '').trim() || fileName;
-        const trailName = r.name || fileBaseName;
+        const trailName = r.name || gpxFileBaseName(fileName);
         let trailDateStr = null;
         if (r.startDate && !isNaN(r.startDate.getTime())) {
           trailDateStr = toLocalDateStr(r.startDate);
@@ -4096,6 +4094,15 @@ function addMoreBatchFiles() {
     inp.value = '';
   };
   inp.click();
+}
+
+// Extract the route/activity name from a GPX filename by stripping the date+time suffix.
+// e.g. "Outdoor Run-Route-2026-03-15 18:20:53" → "Outdoor Run-Route"
+//      "Route 2024-08-08 6:46pm"               → "Route"
+//      "Mission Peak Loop"                      → "Mission Peak Loop" (no date → keep as-is)
+function gpxFileBaseName(fileName) {
+  return fileName.replace(/\.gpx$/i, '').replace(/[-_\s]+\d{4}-\d{2}-\d{2}.*/, '').trim()
+    || fileName.replace(/\.gpx$/i, '');
 }
 
 function finalizeBatchLoad() {
@@ -4513,10 +4520,7 @@ async function loadInboxToQueue() {
       try { r = parseGPX(xmlStr); } catch { fetched++; continue; }
 
       const fileName = file.name.replace(/\.gpx$/i, '');
-      // Strip trailing datetime suffix from filename (e.g. "Outdoor Run-Route-2026-03-15 18:20:53" → "Outdoor Run-Route")
-      const fileBaseName = fileName.replace(/[-_\s]+\d{4}-\d{2}-\d{2}[\sT_]\d{2}[:\-]\d{2}[:\-]\d{2}\S*$/, '').trim() || fileName;
-      // Prefer r.name unless it looks like an auto-generated datetime string (e.g. "Route 2026-03-16T01:20:53Z")
-      const trailName = r.name || fileBaseName;
+      const trailName = r.name || gpxFileBaseName(file.name);
       let trailDateStr = null;
       if (r.startDate && !isNaN(r.startDate.getTime())) trailDateStr = toLocalDateStr(r.startDate);
       if (!trailDateStr) {
