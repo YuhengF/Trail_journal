@@ -4685,7 +4685,7 @@ async function loadPopularFiles(cfg) {
   const body = document.getElementById('popularModalBody');
   body.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted)">Loading...</div>';
   try {
-    const files = await listGitHubFolder(cfg, 'popular/trails');
+    const files = await listGitHubFolder(cfg, 'popular_trails_california');
     popularFiles = files.filter(f => f.type === 'file' && !f.name.startsWith('.'));
     renderPopularList();
   } catch(err) {
@@ -4696,7 +4696,7 @@ async function loadPopularFiles(cfg) {
 function renderPopularList() {
   const body = document.getElementById('popularModalBody');
   if (!popularFiles.length) {
-    body.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted)">No trails found in popular/trails/</div>';
+    body.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted)">No trails found in popular_trails_california/</div>';
     return;
   }
   let h = '<div class="inbox-content">';
@@ -4754,7 +4754,7 @@ async function loadPopularToQueue() {
     btn.textContent = `Loading... ${fetched + 1}/${selected.length}`;
     try {
       const res = await fetch(
-        `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/popular/trails/${encodeURIComponent(file.name)}`,
+        `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/popular_trails_california/${encodeURIComponent(file.name)}`,
         { headers: { 'Authorization': `Bearer ${cfg.token}`, 'Accept': 'application/vnd.github.v3+json' }, cache: 'no-store' }
       );
       if (!res.ok) { fetched++; continue; }
