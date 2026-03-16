@@ -1385,13 +1385,15 @@ img.leaflet-tile { image-rendering: auto; }
       <button class="btn" id="popularBtn" onclick="openPopularModal()" title="Browse popular trails">★ Popular</button>
     </div>
 
-    <div class="sync-bar" id="syncBar">
-      <span class="sync-dot" id="syncDot"></span>
-      <span class="sync-text" id="syncText">Local only</span>
-    </div>
-    <div class="sync-bar" id="inboxStatusBar" style="display:none;cursor:pointer;" onclick="openInboxModal()" title="Click to open inbox">
-      <span class="sync-dot" id="inboxStatusDot"></span>
-      <span class="sync-text" id="inboxStatusText"></span>
+    <div class="sync-bar" style="gap:0;padding:0;">
+      <div id="syncBar" style="flex:1;display:flex;align-items:center;gap:8px;padding:6px 12px;">
+        <span class="sync-dot" id="syncDot"></span>
+        <span class="sync-text" id="syncText">Local only</span>
+      </div>
+      <div id="inboxStatusBar" style="flex:1;display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;border-left:1px solid var(--border);" onclick="openInboxModal()" title="Click to open inbox">
+        <span class="sync-dot" id="inboxStatusDot"></span>
+        <span class="sync-text" id="inboxStatusText">Inbox</span>
+      </div>
     </div>
 
     <div class="token-banner" id="tokenBanner">
@@ -4651,16 +4653,13 @@ function updateInboxStatus() {
       : '↓ Inbox';
   }
   // Status bar
-  const bar = document.getElementById('inboxStatusBar');
   const dot = document.getElementById('inboxStatusDot');
   const text = document.getElementById('inboxStatusText');
-  if (!bar || !dot || !text) return;
+  if (!dot || !text) return;
   if (inboxNewCount > 0) {
-    bar.style.display = 'flex';
-    dot.className = 'sync-dot error'; // red dot
-    text.textContent = `Inbox: ${inboxNewCount} new file${inboxNewCount > 1 ? 's' : ''} — click to import`;
+    dot.className = 'sync-dot error';
+    text.textContent = `Inbox: ${inboxNewCount} new file${inboxNewCount > 1 ? 's' : ''}`;
   } else {
-    bar.style.display = 'flex';
     dot.className = 'sync-dot synced';
     text.textContent = 'Inbox: up to date';
   }
