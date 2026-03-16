@@ -1041,7 +1041,6 @@ img.leaflet-tile { image-rendering: auto; }
 .sort-btn:hover { border-color: var(--text-muted); background: var(--bg-hover); color: var(--text); }
 .sort-btn.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 500; }
 .sort-btn .sort-arrow { font-size: 12px; opacity: 0.6; }
-.sort-btn .sort-label { display: inline-block; min-width: 11ch; text-align: left; }
 .sort-btn .sort-caret { font-size: 8px; opacity: 0.45; margin-left: 1px; }
 
 .sort-dropdown {
@@ -1214,8 +1213,14 @@ img.leaflet-tile { image-rendering: auto; }
 .trail-conditions {
   border-bottom: 1px solid var(--border);
   padding: 8px 20px;
+  display: flex; flex-direction: column; gap: 2px;
+  font-size: 12px;
+}
+.tc-line1 {
   display: flex; align-items: center; gap: 8px;
-  font-size: 12px; min-height: 34px;
+}
+.tc-line2 {
+  display: flex; align-items: baseline; gap: 8px;
 }
 .tc-dot {
   width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
@@ -1228,9 +1233,12 @@ img.leaflet-tile { image-rendering: auto; }
   font-size: 10px; font-weight: 600; text-transform: uppercase;
   letter-spacing: 0.8px; color: var(--text-muted); flex-shrink: 0;
 }
-.tc-status {
-  color: var(--text-dim); flex: 1;
+.tc-area {
+  color: var(--text-dim); font-size: 11px; flex: 1;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tc-status {
+  color: var(--text-dim); font-size: 11px; line-height: 1.4;
 }
 .tc-refresh {
   background: none; border: none; color: var(--text-muted);
@@ -1240,6 +1248,7 @@ img.leaflet-tile { image-rendering: auto; }
 .tc-refresh:hover { color: var(--text); background: var(--bg-hover); }
 @media (max-width: 800px) {
   .trail-conditions { padding: 6px 14px; font-size: 11px; }
+  .tc-status { font-size: 10px; }
 }
 
 /* ELEVATION PROFILE */
@@ -1287,10 +1296,15 @@ img.leaflet-tile { image-rendering: auto; }
     </div>
 
     <div class="trail-conditions" id="trailConditions">
-      <span class="tc-label">Local Conditions</span>
-      <span class="tc-dot" id="tcDot"></span>
-      <span class="tc-status" id="tcStatus">Loading...</span>
-      <button class="tc-refresh" onclick="refreshTrailConditions()" title="Refresh">↻</button>
+      <div class="tc-line1">
+        <span class="tc-label">Local Trail Conditions</span>
+        <span class="tc-dot" id="tcDot"></span>
+        <span class="tc-area" id="tcArea"></span>
+        <button class="tc-refresh" onclick="refreshTrailConditions()" title="Refresh">↻</button>
+      </div>
+      <div class="tc-line2">
+        <span class="tc-status" id="tcStatus">Loading...</span>
+      </div>
     </div>
 
     <div class="controls">
@@ -1301,12 +1315,12 @@ img.leaflet-tile { image-rendering: auto; }
       <div class="filter-row">
         <div class="filter-chips">
           <button class="chip active" data-filter="all">All</button>
-          <button class="chip" data-filter="completed">✓ Completed</button>
+          <button class="chip" data-filter="completed">✓ Done</button>
           <button class="chip" data-filter="wishlist">★ Wishlist</button>
         </div>
         <div class="sort-anchor">
           <button class="sort-btn" id="sortBtn" onclick="toggleSortDropdown(event)">
-            <span class="sort-arrow">⇅</span> Sort: <span id="sortLabel" class="sort-label">Date ↓</span> <span class="sort-caret">▾</span>
+            <span class="sort-arrow">⇅</span> Sort: <span id="sortLabel">Date ↓</span> <span class="sort-caret">▾</span>
           </button>
           <div class="sort-dropdown" id="sortDropdown">
             <button class="sort-option selected" data-sort="date-desc" onclick="setSort('date-desc')"><span class="sort-opt-icon">📅</span> Date<span class="sort-opt-dir">newest first</span></button>
@@ -1697,11 +1711,45 @@ function renderCondition(cond) {
   const dot = document.getElementById('tcDot');
   const status = document.getElementById('tcStatus');
   dot.className = 'tc-dot ' + cond.dot;
-  const rain = cond.rainMm > 0 ? `${cond.rainMm.toFixed(1)}mm` : '';
+  const rain = cond.rainMm > 0 ? `${cond.rainMm.toFixed(1)}mm rain` : '';
   const ago = cond.daysAgo < 0 ? 'No rain 10d' : cond.daysAgo === 0 ? 'today' : `${cond.daysAgo}d ago`;
   const prefix = cond.rainMm > 0 ? `${rain} ${ago} — ` : '';
   status.textContent = prefix + cond.label;
-  status.title = cond.label;
+}
+
+function renderAreaName(name) {
+  document.getElementById('tcArea').textContent = name ? '· ' + name : '';
+}
+
+async function fetchAreaName(lat, lon) {
+  const rLat = Math.round(lat * 4) / 4;
+  const rLon = Math.round(lon * 4) / 4;
+  const geoKey = `geo_${rLat},${rLon}`;
+  try {
+    const cache = JSON.parse(sessionStorage.getItem(TC_CACHE_KEY)) || {};
+    if (cache[geoKey] && Date.now() - cache[geoKey].ts < 24 * 60 * 60 * 1000) {
+      renderAreaName(cache[geoKey].name);
+      return;
+    }
+  } catch {}
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${rLat}&lon=${rLon}&format=json&zoom=8&addressdetails=1`, {
+      headers: { 'Accept-Language': 'en' }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    const a = data.address || {};
+    const place = a.city || a.town || a.county || a.state || '';
+    const stateAbbr = a.state ? (a['ISO3166-2-lvl4'] || '').replace(/^[A-Z]{2}-/, '') || a.state : '';
+    const region = stateAbbr && place !== a.state ? stateAbbr : a.country || '';
+    const name = region && place ? `${place}, ${region}` : place || region || '';
+    renderAreaName(name);
+    try {
+      const cache = JSON.parse(sessionStorage.getItem(TC_CACHE_KEY)) || {};
+      cache[geoKey] = { ts: Date.now(), name };
+      sessionStorage.setItem(TC_CACHE_KEY, JSON.stringify(cache));
+    } catch {}
+  } catch {}
 }
 
 async function fetchTrailConditions(forceRefresh) {
@@ -1723,6 +1771,7 @@ async function fetchTrailConditions(forceRefresh) {
         tcLastLat = lat;
         tcLastLon = lon;
         renderCondition(cache[key].cond);
+        fetchAreaName(lat, lon);
         return;
       }
     } catch {}
@@ -1747,6 +1796,7 @@ async function fetchTrailConditions(forceRefresh) {
     tcRetryCount = 0;
     clearTimeout(tcRetryTimer);
     renderCondition(cond);
+    fetchAreaName(lat, lon);
   } catch {
     document.getElementById('tcStatus').textContent = 'Could not load conditions';
     if (tcRetryCount < TC_MAX_RETRIES) {
