@@ -38,9 +38,6 @@ Just so I don't need any server or datasync services other than github. There're
 (You're welcome to think of the metaphors of other more advanced operations, for example if I store your data directly in a public json file together with the Page session? Or if someone wants to use other cloud services or data servers?)
 
 
-## TO-DO
-1. Provide recommended trails in the area
-
 ## Notes for myself or users who want to know techinically/procedurally how I store their data under my github account:
 
 1. Create private repo, say, named "data_tom". Then create fine-grained token to access this data repo (under Developer Settings -> Personal access tokens (Fine-grained tokens) -> Generate new token -> Token name, appropriate expiration time -> only selected repo -> select that private data repo for user -> Add permissions -> contents -> read and write -> done -> send that token to user);
