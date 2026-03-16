@@ -4364,24 +4364,17 @@ async function fetchAndRenderInbox(cfg, inboxPath) {
     ]);
 
     inboxAllFiles = allFiles;
-    inboxGpxFiles = allFiles.filter(f => f.type === 'file' && f.name.toLowerCase().endsWith('.gpx'));
+    // Accept all non-hidden files regardless of extension (fitness apps often export without .gpx)
+    inboxGpxFiles = allFiles.filter(f => f.type === 'file' && !f.name.startsWith('.'));
     inboxProcessedNames = new Set(processedFiles.filter(f => f.type === 'file').map(f => f.name));
 
     if (msgEl) msgEl.remove();
 
-    if (allFiles.length === 0) {
-      appendInboxContent(`<div style="text-align:center;padding:24px;color:var(--text-muted)">
-        Folder <code style="font-size:11px;background:var(--bg-input);padding:1px 5px;border-radius:4px;">${escapeHtml(inboxPath)}</code> not found or empty in <strong>${escapeHtml(cfg.repo)}</strong>.
-        <div style="font-size:11px;margin-top:6px;">Check the path above matches your repo structure.</div>
-      </div>`);
-      return;
-    }
-
     if (!inboxGpxFiles.length) {
-      const names = allFiles.map(f => escapeHtml(f.name)).join(', ');
-      appendInboxContent(`<div style="padding:16px;color:var(--text-dim);font-size:12px;">
-        No <code>.gpx</code> files in <strong>${escapeHtml(inboxPath)}/</strong>.
-        Found ${allFiles.length} other file(s): <span style="color:var(--text-muted)">${names}</span>
+      appendInboxContent(`<div style="text-align:center;padding:24px;color:var(--text-muted)">
+        No files found in <code style="font-size:11px;background:var(--bg-input);padding:1px 5px;border-radius:4px;">${escapeHtml(inboxPath)}</code>
+        ${allFiles.length ? `(${allFiles.length} subdir(s) only)` : '— folder not found or empty'} in <strong>${escapeHtml(cfg.repo)}</strong>.
+        <div style="font-size:11px;margin-top:6px;">Check the path above matches your repo structure.</div>
       </div>`);
       return;
     }
