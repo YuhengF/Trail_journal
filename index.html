@@ -4512,7 +4512,11 @@ async function loadInboxToQueue() {
       try { r = parseGPX(xmlStr); } catch { fetched++; continue; }
 
       const fileName = file.name.replace(/\.gpx$/i, '');
-      const trailName = r.name || fileName;
+      // Strip trailing datetime suffix from filename (e.g. "Outdoor Run-Route-2026-03-15 18:20:53" → "Outdoor Run-Route")
+      const fileBaseName = fileName.replace(/[-_\s]+\d{4}-\d{2}-\d{2}[\sT_]\d{2}[:\-]\d{2}[:\-]\d{2}\S*$/, '').trim() || fileName;
+      // Prefer r.name unless it looks like an auto-generated datetime string (e.g. "Route 2026-03-16T01:20:53Z")
+      const isAutoName = !r.name || /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(r.name);
+      const trailName = isAutoName ? fileBaseName : r.name;
       let trailDateStr = null;
       if (r.startDate && !isNaN(r.startDate.getTime())) trailDateStr = toLocalDateStr(r.startDate);
       if (!trailDateStr) {
