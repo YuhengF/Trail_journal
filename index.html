@@ -4554,12 +4554,12 @@ async function loadInboxToQueue() {
     return;
   }
 
+  // openAddModal resets batchQueue, so call it first then populate
+  openAddModal();
   batchQueue = items;
   batchQueue.sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.name || '').localeCompare(b.name || ''));
   batchCurrentIdx = -1;
   batchLastSavedTags = '';
-
-  openAddModal();
   document.getElementById('gpxDrop').style.display = 'none';
   renderBatchQueue();
   selectBatchItem(0);
