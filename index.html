@@ -4478,7 +4478,16 @@ function isInProcessed(fileName) {
   return false;
 }
 
-function isContentDuplicate(distance, dateStr) {
+function isContentDuplicate(startDate, distance, dateStr) {
+  // Primary: exact first trkpt timestamp match (same ms = definitely the same file)
+  if (startDate && !isNaN(startDate.getTime())) {
+    const startMs = startDate.getTime();
+    if (trails.some(t => {
+      const firstTs = t.gpxTimes?.find(ts => ts !== null && !isNaN(ts));
+      return firstTs === startMs;
+    })) return true;
+  }
+  // Fallback for older trails with no gpxTimes: date + distance ≈ match
   if (!dateStr) return false;
   const dist = parseFloat(distance);
   return trails.some(t => {
@@ -4530,7 +4539,7 @@ async function loadInboxToQueue() {
       }
 
       // Option C: content-duplicate check (date + distance match)
-      if (skip && isContentDuplicate(r.distance, trailDateStr)) { fetched++; continue; }
+      if (skip && isContentDuplicate(r.startDate, r.distance, trailDateStr)) { fetched++; continue; }
 
       items.push({
         parsed: r, name: trailName, date: trailDateStr,
