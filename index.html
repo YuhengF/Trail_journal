@@ -4364,24 +4364,17 @@ async function fetchAndRenderInbox(cfg, inboxPath) {
     ]);
 
     inboxAllFiles = allFiles;
-    inboxGpxFiles = allFiles.filter(f => f.type === 'file' && f.name.toLowerCase().endsWith('.gpx'));
+    // Accept all non-hidden files regardless of extension (fitness apps often export without .gpx)
+    inboxGpxFiles = allFiles.filter(f => f.type === 'file' && !f.name.startsWith('.'));
     inboxProcessedNames = new Set(processedFiles.filter(f => f.type === 'file').map(f => f.name));
 
     if (msgEl) msgEl.remove();
 
-    if (allFiles.length === 0) {
-      appendInboxContent(`<div style="text-align:center;padding:24px;color:var(--text-muted)">
-        Folder <code style="font-size:11px;background:var(--bg-input);padding:1px 5px;border-radius:4px;">${escapeHtml(inboxPath)}</code> not found or empty in <strong>${escapeHtml(cfg.repo)}</strong>.
-        <div style="font-size:11px;margin-top:6px;">Check the path above matches your repo structure.</div>
-      </div>`);
-      return;
-    }
-
     if (!inboxGpxFiles.length) {
-      const names = allFiles.map(f => escapeHtml(f.name)).join(', ');
-      appendInboxContent(`<div style="padding:16px;color:var(--text-dim);font-size:12px;">
-        No <code>.gpx</code> files in <strong>${escapeHtml(inboxPath)}/</strong>.
-        Found ${allFiles.length} other file(s): <span style="color:var(--text-muted)">${names}</span>
+      appendInboxContent(`<div style="text-align:center;padding:24px;color:var(--text-muted)">
+        No files found in <code style="font-size:11px;background:var(--bg-input);padding:1px 5px;border-radius:4px;">${escapeHtml(inboxPath)}</code>
+        ${allFiles.length ? `(${allFiles.length} subdir(s) only)` : '— folder not found or empty'} in <strong>${escapeHtml(cfg.repo)}</strong>.
+        <div style="font-size:11px;margin-top:6px;">Check the path above matches your repo structure.</div>
       </div>`);
       return;
     }
@@ -4439,7 +4432,7 @@ function renderInboxStatus() {
 
   inboxGpxFiles.forEach(file => {
     let statusClass, statusLabel;
-    if (skip && inboxProcessedNames.has(file.name)) {
+    if (skip && isInProcessed(file.name)) {
       statusClass = 'inbox-status-skipped';
       statusLabel = 'processed';
     } else {
@@ -4464,6 +4457,17 @@ function renderInboxStatus() {
 
 function escapeHtml(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function stripExt(name) { return name.replace(/\.[^.]+$/, ''); }
+
+function isInProcessed(fileName) {
+  if (inboxProcessedNames.has(fileName)) return true;
+  const base = stripExt(fileName);
+  for (const p of inboxProcessedNames) {
+    if (p === base || stripExt(p) === base) return true;
+  }
+  return false;
 }
 
 function isContentDuplicate(distance, dateStr) {
@@ -4550,13 +4554,22 @@ async function loadInboxToQueue() {
     return;
   }
 
+  // Set up the add modal manually to avoid openAddModal() resetting batchQueue
+  editingId = null; gpxTrackData = null; gpxSpeedData = null; gpxTimesData = null; gpxElevData = null;
+  batchCurrentIdx = -1; batchLastSavedTags = '';
+  clearGpxPreview();
+  document.getElementById('modalTitle').textContent = 'Add Trail';
+  document.getElementById('saveBtn').textContent = 'Save Trail';
+  clearForm();
+  document.getElementById('fDate').value = toLocalDateStr(new Date());
+  document.getElementById('gpxDrop').style.display = 'none';
+  document.getElementById('batchQueue').innerHTML = '';
+  document.getElementById('modalOverlay').classList.add('open');
+  renderModalTagPicker();
+  if (window.innerWidth <= 800) document.getElementById('sidebar').classList.remove('mobile-visible');
+
   batchQueue = items;
   batchQueue.sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.name || '').localeCompare(b.name || ''));
-  batchCurrentIdx = -1;
-  batchLastSavedTags = '';
-
-  openAddModal();
-  document.getElementById('gpxDrop').style.display = 'none';
   renderBatchQueue();
   selectBatchItem(0);
   updateBatchSaveButton();
