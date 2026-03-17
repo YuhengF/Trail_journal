@@ -4598,22 +4598,27 @@ async function archiveInboxFile(inboxFile) {
   const cfg = getSyncConfig();
   if (!cfg || !inboxFile) return;
   const base = 'inbox';
+  const headers = { 'Authorization': `Bearer ${cfg.token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' };
   try {
-    // Step 1: copy to {inbox}/processed/
-    await fetch(
-      `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${base}/processed/${encodeURIComponent(inboxFile.name)}`,
-      {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${cfg.token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: `Archive processed GPX: ${inboxFile.name}`, content: inboxFile.content })
+    // Step 1: copy to {inbox}/processed/ — if it already exists, fetch its SHA first
+    const processedUrl = `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${base}/processed/${encodeURIComponent(inboxFile.name)}`;
+    const putBody = { message: `Archive processed GPX: ${inboxFile.name}`, content: inboxFile.content };
+    let putRes = await fetch(processedUrl, { method: 'PUT', headers, body: JSON.stringify(putBody) });
+    if (!putRes.ok && putRes.status === 422) {
+      // File already exists in processed/ — fetch its SHA and overwrite
+      const existing = await fetch(processedUrl, { headers });
+      if (existing.ok) {
+        const existingData = await existing.json();
+        putBody.sha = existingData.sha;
+        putRes = await fetch(processedUrl, { method: 'PUT', headers, body: JSON.stringify(putBody) });
       }
-    );
-    // Step 2: delete from {inbox}/
+    }
+    // Step 2: delete from {inbox}/ regardless of whether step 1 created or updated
     await fetch(
       `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${base}/${encodeURIComponent(inboxFile.name)}`,
       {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${cfg.token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ message: `Remove from inbox after processing: ${inboxFile.name}`, sha: inboxFile.sha })
       }
     );
