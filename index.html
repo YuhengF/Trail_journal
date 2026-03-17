@@ -1608,13 +1608,17 @@ img.leaflet-tile { image-rendering: auto; }
       <button class="modal-close" onclick="closeSettings()">×</button>
     </div>
     <div class="modal-body">
-      <div style="font-size:12px;color:var(--text-dim);line-height:1.6;margin-bottom:16px;background:var(--bg-input);padding:12px 14px;border-radius:8px;border:1px solid var(--border-light);">
-        <strong style="color:var(--text);">How it works:</strong> Your trail data syncs to a <strong>private</strong> GitHub repo (only you can see it). This app's HTML is hosted separately on a <strong>public</strong> repo via GitHub Pages.<br><br>
-        <strong style="color:var(--text);">Setup (one time):</strong><br>
-        1. Create a <strong>private</strong> repo (e.g. <code style="background:var(--bg-panel);padding:1px 4px;border-radius:3px;">trail-data</code>) — this stores your data<br>
-        2. Create a <strong>public</strong> repo (e.g. <code style="background:var(--bg-panel);padding:1px 4px;border-radius:3px;">trail-journal</code>) — put this HTML file as <code style="background:var(--bg-panel);padding:1px 4px;border-radius:3px;">index.html</code>, enable Pages<br>
-        3. Create a fine-grained token with access to the <em>private</em> repo only<br>
-        4. Enter the <em>private</em> repo details below
+      <div style="font-size:12px;color:var(--text-dim);line-height:1.6;margin-bottom:16px;">
+        Sync your trail data to a private GitHub repository — accessible across all your devices.
+        <button onclick="toggleSyncHelp()" id="syncHelpToggle" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;padding:0 0 0 4px;text-decoration:underline;">Show setup guide</button>
+      </div>
+      <div id="syncHelpDetails" style="display:none;font-size:12px;color:var(--text-dim);line-height:1.6;margin-bottom:16px;background:var(--bg-input);padding:12px 14px;border-radius:8px;border:1px solid var(--border-light);">
+        <strong style="color:var(--text);">One-time setup:</strong><br>
+        1. Create a <strong>private</strong> GitHub repo (e.g. <code style="background:var(--bg-panel);padding:1px 4px;border-radius:3px;">trail-data</code>) — this will store your data<br>
+        2. Generate a fine-grained personal access token: GitHub → Settings → Developer settings → Fine-grained tokens<br>
+        &nbsp;&nbsp;&nbsp;• Repository access → <strong>Only select repositories</strong> → pick your private data repo<br>
+        &nbsp;&nbsp;&nbsp;• Permissions → Contents: <strong>Read and write</strong><br>
+        3. Enter your username, repo name, and token below, then tap <strong>Save</strong>
       </div>
       <div class="form-group">
         <label>GitHub Username</label>
@@ -1625,26 +1629,25 @@ img.leaflet-tile { image-rendering: auto; }
         <input type="text" id="ghRepo" placeholder="trail-data">
       </div>
       <div class="form-group">
-        <label>Personal Access Token <span style="color:var(--text-muted);text-transform:none;letter-spacing:0">(stored in your browser only, never in any repo)</span></label>
+        <label>Personal Access Token <span style="color:var(--text-muted);text-transform:none;letter-spacing:0">(stored in your browser only)</span></label>
         <input type="password" id="ghToken" placeholder="github_pat_...">
       </div>
-      <div class="form-group">
-        <label>Data File Path</label>
-        <input type="text" id="ghPath" placeholder="data.json" value="data.json">
+      <div id="advancedSyncFields" style="display:none;">
+        <div class="form-group">
+          <label>Data File Path</label>
+          <input type="text" id="ghPath" placeholder="data.json" value="data.json">
+        </div>
       </div>
-      <p style="font-size:11px;color:var(--text-muted);line-height:1.5;margin-bottom:12px;">
-        <strong>Token setup:</strong> GitHub → Settings → Developer settings → Fine-grained tokens → Generate new token<br>
-        • Repository access → <strong>Only select repositories</strong> → pick your private data repo<br>
-        • Permissions → Contents: <strong>Read and write</strong><br>
-        • The token never leaves your browser. Each device needs its own token entry.
-      </p>
+      <div style="margin-bottom:14px;">
+        <button onclick="toggleAdvancedSync()" id="advancedSyncToggle" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:11px;padding:0;text-decoration:underline;">Advanced options</button>
+      </div>
 
       <div style="border-top:1px solid var(--border-light);margin:16px 0 12px;"></div>
 
       <div class="form-group" style="margin-bottom:8px;">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-          <input type="checkbox" id="ghEncrypt" onchange="toggleEncryptFields()">
-          <span>Encrypt my data <span style="color:var(--text-muted);text-transform:none;letter-spacing:0;font-weight:normal;">(only you can read it — not even the repo owner)</span></span>
+        <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:13px;font-weight:normal;color:var(--text);">
+          <input type="checkbox" id="ghEncrypt" onchange="toggleEncryptFields()" style="flex-shrink:0;margin-top:2px;width:auto;">
+          <span style="flex:1;min-width:0;">Encrypt my data <span style="color:var(--text-muted);">(only you can read it — not even the repo owner)</span></span>
         </label>
       </div>
       <div id="encryptFields" style="display:none;">
@@ -2380,11 +2383,12 @@ function getSyncConfig() {
 
 function openSettings() {
   const cfg = getSyncConfig();
+  const path = cfg ? (cfg.path || 'data.json') : 'data.json';
   if (cfg) {
     document.getElementById('ghUser').value = cfg.user || '';
     document.getElementById('ghRepo').value = cfg.repo || '';
     document.getElementById('ghToken').value = cfg.token || '';
-    document.getElementById('ghPath').value = cfg.path || 'data.json';
+    document.getElementById('ghPath').value = path;
     document.getElementById('ghEncrypt').checked = !!cfg.encrypt;
     document.getElementById('ghPassphrase').value = cfg.passphrase || '';
   } else {
@@ -2392,6 +2396,12 @@ function openSettings() {
     document.getElementById('ghPassphrase').value = '';
   }
   toggleEncryptFields();
+  // Reset collapsibles; auto-expand advanced if non-default path is set
+  const advancedOpen = path !== 'data.json';
+  document.getElementById('advancedSyncFields').style.display = advancedOpen ? 'block' : 'none';
+  document.getElementById('advancedSyncToggle').textContent = advancedOpen ? 'Hide advanced options' : 'Advanced options';
+  document.getElementById('syncHelpDetails').style.display = 'none';
+  document.getElementById('syncHelpToggle').textContent = 'Show setup guide';
   document.getElementById('syncTestResult').innerHTML = '';
   document.getElementById('settingsOverlay').classList.add('open');
 }
@@ -2399,6 +2409,22 @@ function openSettings() {
 function toggleEncryptFields() {
   document.getElementById('encryptFields').style.display =
     document.getElementById('ghEncrypt').checked ? 'block' : 'none';
+}
+
+function toggleSyncHelp() {
+  const el = document.getElementById('syncHelpDetails');
+  const btn = document.getElementById('syncHelpToggle');
+  const open = el.style.display === 'none';
+  el.style.display = open ? 'block' : 'none';
+  btn.textContent = open ? 'Hide setup guide' : 'Show setup guide';
+}
+
+function toggleAdvancedSync() {
+  const el = document.getElementById('advancedSyncFields');
+  const btn = document.getElementById('advancedSyncToggle');
+  const open = el.style.display === 'none';
+  el.style.display = open ? 'block' : 'none';
+  btn.textContent = open ? 'Hide advanced options' : 'Advanced options';
 }
 
 function closeSettings(e) {
