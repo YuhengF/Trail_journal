@@ -4420,15 +4420,20 @@ async function listGitHubFolder(cfg, path) {
 
 function closeInboxModal(e) {
   if (e && e.target !== e.currentTarget) return;
-  // If skip is still checked on close, clean up inbox files already in processed/
+  document.getElementById('inboxOverlay').classList.remove('open');
+  // If skip is still checked on close, clean up inbox files already in processed/ sequentially
   const skipEl = document.getElementById('inboxSkipExisting');
   if (skipEl && skipEl.checked) {
-    inboxGpxFiles.filter(f => isInProcessed(f.name)).forEach(f => {
-      archiveInboxFile({ name: f.name, sha: f.sha, content: null, inboxPath: 'inbox' });
-    });
+    const toClean = inboxGpxFiles.filter(f => isInProcessed(f.name));
+    (async () => {
+      for (const f of toClean) {
+        await archiveInboxFile({ name: f.name, sha: f.sha, content: null, inboxPath: 'inbox' });
+      }
+      refreshInboxBadge();
+    })();
+  } else {
+    refreshInboxBadge();
   }
-  document.getElementById('inboxOverlay').classList.remove('open');
-  refreshInboxBadge();
 }
 
 function renderInboxFileList() {
