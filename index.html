@@ -946,9 +946,10 @@ img.leaflet-tile { image-rendering: auto; }
   /* Map controls */
   .map-controls { top: 12px; right: 12px; }
 
-  /* Detail panel: bottom sheet exposing top 45% of screen for the map */
+  /* Detail panel: bottom sheet exposing top 25% of screen for the map */
   .detail-panel {
-    top: 75vh;
+    top: 25vh;
+    top: 25dvh; /* dynamic vh accounts for browser chrome (address bar etc.) */
     bottom: calc(56px + env(safe-area-inset-bottom, 0px));
     left: 0; right: 0; width: 100%;
     border-left: none;
@@ -1025,13 +1026,15 @@ img.leaflet-tile { image-rendering: auto; }
 
   /* Modal — bottom sheet, expose top 25% of screen for map */
   .modal-overlay {
-    top: 25vh; /* only cover bottom 75%, leaving top 25% as visible map */
+    top: 25vh;
+    top: 25dvh; /* dynamic: shrinks when browser chrome appears */
     padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
     align-items: flex-end;
   }
   .modal {
     border-radius: 16px 16px 0 0;
     max-height: calc(75vh - 56px - env(safe-area-inset-bottom, 0px));
+    max-height: calc(75dvh - 56px - env(safe-area-inset-bottom, 0px));
     margin-top: auto; width: 100%; max-width: 100%;
     display: flex; flex-direction: column; overflow: hidden;
   }
@@ -1053,7 +1056,7 @@ img.leaflet-tile { image-rendering: auto; }
     font-size: 16px; padding: 12px 14px; border-radius: 10px;
   }
   .form-group .star-input span { font-size: 30px; }
-  .modal-footer { padding: 0 20px 20px; }
+  .modal-footer { padding: 0 20px calc(20px + env(safe-area-inset-bottom, 0px)); }
   .modal-footer .btn { padding: 14px 20px; font-size: 14px; }
 
   /* GPX drop zone more tappable */
@@ -3111,15 +3114,21 @@ function renderMap() {
   } else { badge.classList.remove('visible'); }
 }
 
-function focusTrail(id) {
+function focusTrail(id, withDetailPanel = false) {
   const layer = trailLayers[id];
   if (layer) {
     if (!savedMapView) savedMapView = { center: map.getCenter(), zoom: map.getZoom() };
     let fitOptions;
     if (window.innerWidth <= 800) {
-      // On mobile the detail panel covers the bottom ~55% of screen (panel top = 45vh).
-      // Push the trail into the exposed top portion by using a large bottom padding.
-      const bottomPad = Math.round(window.innerHeight * 0.75) + 56;
+      let bottomPad;
+      if (withDetailPanel) {
+        // Detail panel covers bottom 75% (starts at 25vh) — fit trail into top 25%
+        bottomPad = Math.round(window.innerHeight * 0.75) + 56;
+      } else {
+        // Only elevation profile is visible — use its actual height + position
+        const elevEl = document.getElementById('elevProfile');
+        bottomPad = elevEl ? elevEl.offsetHeight + 70 + 20 : 200;
+      }
       fitOptions = { paddingTopLeft: [20, 40], paddingBottomRight: [20, bottomPad], maxZoom: 15 };
     } else {
       fitOptions = { padding: [80, 80], maxZoom: 15 };
@@ -5165,7 +5174,7 @@ function openDetail(id) {
   document.getElementById('detailPanel').classList.add('open');
   // On mobile, switch to map tab so user sees the trail
   if (window.innerWidth <= 800) switchMobileTab('map', false);
-  if (t.coords&&t.coords.length) focusTrail(id);
+  if (t.coords&&t.coords.length) focusTrail(id, true);
 }
 
 function closeDetail() {
