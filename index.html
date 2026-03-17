@@ -4383,11 +4383,6 @@ async function fetchAndRenderInbox(cfg, inboxPath) {
     inboxGpxFiles = allFiles.filter(f => f.type === 'file' && !f.name.startsWith('.'));
     inboxProcessedNames = new Set(processedFiles.filter(f => f.type === 'file').map(f => f.name));
 
-    // Auto-clean: delete from inbox/ any file already in processed/ (silently, no SHA fetch needed — reuse file.sha from listing)
-    inboxGpxFiles.filter(f => isInProcessed(f.name)).forEach(f => {
-      archiveInboxFile({ name: f.name, sha: f.sha, content: null, inboxPath });
-    });
-
     if (msgEl) msgEl.remove();
 
     if (!inboxGpxFiles.length) {
@@ -4425,6 +4420,13 @@ async function listGitHubFolder(cfg, path) {
 
 function closeInboxModal(e) {
   if (e && e.target !== e.currentTarget) return;
+  // If skip is still checked on close, clean up inbox files already in processed/
+  const skipEl = document.getElementById('inboxSkipExisting');
+  if (skipEl && skipEl.checked) {
+    inboxGpxFiles.filter(f => isInProcessed(f.name)).forEach(f => {
+      archiveInboxFile({ name: f.name, sha: f.sha, content: null, inboxPath: 'inbox' });
+    });
+  }
   document.getElementById('inboxOverlay').classList.remove('open');
   refreshInboxBadge();
 }
