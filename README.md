@@ -20,7 +20,7 @@ I used claude to write this app to track my personal hiking record. I tried to i
 Just so I don't need any server or datasync services other than github. There're a million of other ways, but this way is the most viable if someone wants to deploy this app when they have and only have a github account.
 
 
-## A fun metaphor of this whole thing (app/data/encryption/etc) I thought of and might help you understand intuitively:
+## A fun metaphor of this whole thing (app/data/encryption/etc) I thought of and might help you understand intuitively (if you're unfamiliar with programming or webpage app):
 1. Github is like a hotpot restaurant that has lots of tables with lots of hotpot machines
 2. I am one of their customers who currently sits at and rents/uses one of thier hotpot matchines (=my github account)
 3. I use the hotpot machine (=my github account) to make some tasty hotpot soup (=this web app I design and make)
