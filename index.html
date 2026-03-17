@@ -343,6 +343,7 @@ body {
 
 /* hidden on desktop, shown only on mobile */
 .detail-drag-handle { display: none; }
+.modal-drag-handle { display: none; }
 .map-drag-btn { display: none; }
 
 /* map drag mode: panel body becomes pass-through */
@@ -947,7 +948,7 @@ img.leaflet-tile { image-rendering: auto; }
 
   /* Detail panel: bottom sheet exposing top 45% of screen for the map */
   .detail-panel {
-    top: 45vh;
+    top: 75vh;
     bottom: calc(56px + env(safe-area-inset-bottom, 0px));
     left: 0; right: 0; width: 100%;
     border-left: none;
@@ -1022,10 +1023,27 @@ img.leaflet-tile { image-rendering: auto; }
   .detail-section h3 { font-size: 12px; }
   .detail-section p { font-size: 14px; }
 
-  /* Modal — bottom sheet above tab bar */
-  .modal-overlay { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); align-items: flex-end; }
-  .modal { border-radius: 16px 16px 0 0; max-height: calc(92vh - 56px - env(safe-area-inset-bottom, 0px)); margin-top: auto; width: 100%; max-width: 100%; }
-  .modal-header { padding: 20px 20px 0; }
+  /* Modal — bottom sheet, expose top 25% of screen for map */
+  .modal-overlay {
+    top: 25vh; /* only cover bottom 75%, leaving top 25% as visible map */
+    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    align-items: flex-end;
+  }
+  .modal {
+    border-radius: 16px 16px 0 0;
+    max-height: calc(75vh - 56px - env(safe-area-inset-bottom, 0px));
+    margin-top: auto; width: 100%; max-width: 100%;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .modal-body { flex: 1; overflow-y: auto; min-height: 0; }
+  .modal-drag-handle {
+    display: block; flex-shrink: 0;
+    width: 36px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 10px auto 0;
+  }
+  .modal-header { padding: 12px 20px 0; }
   .modal-header h2 { font-size: 20px; }
   .modal-close { width: 36px; height: 36px; font-size: 20px; }
   .modal-body { padding: 16px 20px 20px; }
@@ -1521,6 +1539,7 @@ img.leaflet-tile { image-rendering: auto; }
 <!-- ADD/EDIT MODAL -->
 <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
   <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-drag-handle"></div>
     <div class="modal-header">
       <h2 id="modalTitle">Add Trail</h2>
       <button class="modal-close" onclick="closeModal()">×</button>
@@ -3100,7 +3119,7 @@ function focusTrail(id) {
     if (window.innerWidth <= 800) {
       // On mobile the detail panel covers the bottom ~55% of screen (panel top = 45vh).
       // Push the trail into the exposed top portion by using a large bottom padding.
-      const bottomPad = Math.round(window.innerHeight * 0.55) + 56;
+      const bottomPad = Math.round(window.innerHeight * 0.75) + 56;
       fitOptions = { paddingTopLeft: [20, 40], paddingBottomRight: [20, bottomPad], maxZoom: 15 };
     } else {
       fitOptions = { padding: [80, 80], maxZoom: 15 };
@@ -3135,14 +3154,18 @@ function showGpxPreview(coords) {
   });
   const mapEl = document.getElementById('map');
   const mapW = mapEl.offsetWidth, mapH = mapEl.offsetHeight;
-  const modal = document.querySelector('.modal');
-  const modalW = modal ? modal.offsetWidth : 520;
-  const leftPad = Math.max(modalW + 40, mapW * 0.45);
-  map.fitBounds(line.getBounds(), {
-    paddingTopLeft: [leftPad, 60],
-    paddingBottomRight: [40, 60],
-    maxZoom: 15, animate: true
-  });
+  let fitOpts;
+  if (window.innerWidth <= 800) {
+    // On mobile the modal covers bottom 75% + tab bar — fit trail in top 25%
+    const bottomPad = Math.round(window.innerHeight * 0.75) + 56;
+    fitOpts = { paddingTopLeft: [20, 30], paddingBottomRight: [20, bottomPad], maxZoom: 15, animate: true };
+  } else {
+    const modal = document.querySelector('.modal');
+    const modalW = modal ? modal.offsetWidth : 520;
+    const leftPad = Math.max(modalW + 40, mapW * 0.45);
+    fitOpts = { paddingTopLeft: [leftPad, 60], paddingBottomRight: [40, 60], maxZoom: 15, animate: true };
+  }
+  map.fitBounds(line.getBounds(), fitOpts);
   document.getElementById('modalOverlay').classList.add('gpx-preview');
 }
 
