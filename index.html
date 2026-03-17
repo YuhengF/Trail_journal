@@ -4447,20 +4447,12 @@ function renderInboxStatus() {
   let toLoad = 0;
 
   inboxGpxFiles.forEach(file => {
-    let statusClass, statusLabel;
-    if (skip && isInProcessed(file.name)) {
-      statusClass = 'inbox-status-skipped';
-      statusLabel = 'processed';
-    } else {
-      // Content-duplicate check can only be done after parsing; flag tentatively here
-      statusClass = 'inbox-status-new';
-      statusLabel = 'new';
-      toLoad++;
-    }
+    if (skip && isInProcessed(file.name)) return; // hide processed files when skip is on
     listHtml += `<div class="inbox-file-item">`;
     listHtml += `<span class="inbox-file-name">${escapeHtml(file.name)}</span>`;
-    listHtml += `<span class="inbox-file-status ${statusClass}">${statusLabel}</span>`;
+    listHtml += `<span class="inbox-file-status inbox-status-new">new</span>`;
     listHtml += `</div>`;
+    toLoad++;
   });
 
   document.getElementById('inboxFileList').innerHTML = listHtml;
