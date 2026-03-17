@@ -4547,7 +4547,11 @@ async function loadInboxToQueue() {
       }
 
       // Option C: content-duplicate check (date + distance match)
-      if (skip && isContentDuplicate(r.startDate, r.distance, trailDateStr)) { fetched++; continue; }
+      if (skip && isContentDuplicate(r.startDate, r.distance, trailDateStr)) {
+        // Archive so it no longer appears in the inbox badge
+        archiveInboxFile({ name: file.name, sha: meta.sha, content: base64, inboxPath });
+        fetched++; continue;
+      }
 
       items.push({
         parsed: r, name: trailName, date: trailDateStr,
