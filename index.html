@@ -3133,6 +3133,7 @@ function focusTrail(id, withDetailPanel = false) {
     } else {
       fitOptions = { padding: [80, 80], maxZoom: 15 };
     }
+    map.stop();
     map.fitBounds(layer.hitArea.getBounds(), fitOptions);
     Object.entries(trailLayers).forEach(([tid, l]) => {
       const f = tid === id;
@@ -3174,6 +3175,7 @@ function showGpxPreview(coords) {
     const leftPad = Math.max(modalW + 40, mapW * 0.45);
     fitOpts = { paddingTopLeft: [leftPad, 60], paddingBottomRight: [40, 60], maxZoom: 15, animate: true };
   }
+  map.stop();
   map.fitBounds(line.getBounds(), fitOpts);
   document.getElementById('modalOverlay').classList.add('gpx-preview');
 }
