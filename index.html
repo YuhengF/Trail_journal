@@ -4383,6 +4383,11 @@ async function fetchAndRenderInbox(cfg, inboxPath) {
     inboxGpxFiles = allFiles.filter(f => f.type === 'file' && !f.name.startsWith('.'));
     inboxProcessedNames = new Set(processedFiles.filter(f => f.type === 'file').map(f => f.name));
 
+    // Auto-clean: delete from inbox/ any file already in processed/ (silently, no SHA fetch needed — reuse file.sha from listing)
+    inboxGpxFiles.filter(f => isInProcessed(f.name)).forEach(f => {
+      archiveInboxFile({ name: f.name, sha: f.sha, content: null, inboxPath });
+    });
+
     if (msgEl) msgEl.remove();
 
     if (!inboxGpxFiles.length) {
@@ -4600,20 +4605,22 @@ async function archiveInboxFile(inboxFile) {
   const base = 'inbox';
   const headers = { 'Authorization': `Bearer ${cfg.token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' };
   try {
-    // Step 1: copy to {inbox}/processed/ — if it already exists, fetch its SHA first
-    const processedUrl = `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${base}/processed/${encodeURIComponent(inboxFile.name)}`;
-    const putBody = { message: `Archive processed GPX: ${inboxFile.name}`, content: inboxFile.content };
-    let putRes = await fetch(processedUrl, { method: 'PUT', headers, body: JSON.stringify(putBody) });
-    if (!putRes.ok && putRes.status === 422) {
-      // File already exists in processed/ — fetch its SHA and overwrite
-      const existing = await fetch(processedUrl, { headers });
-      if (existing.ok) {
-        const existingData = await existing.json();
-        putBody.sha = existingData.sha;
-        putRes = await fetch(processedUrl, { method: 'PUT', headers, body: JSON.stringify(putBody) });
+    // Step 1: copy to {inbox}/processed/ (skip if content is null — already there)
+    if (inboxFile.content) {
+      const processedUrl = `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${base}/processed/${encodeURIComponent(inboxFile.name)}`;
+      const putBody = { message: `Archive processed GPX: ${inboxFile.name}`, content: inboxFile.content };
+      let putRes = await fetch(processedUrl, { method: 'PUT', headers, body: JSON.stringify(putBody) });
+      if (!putRes.ok && putRes.status === 422) {
+        // File already exists in processed/ — fetch its SHA and overwrite
+        const existing = await fetch(processedUrl, { headers });
+        if (existing.ok) {
+          const existingData = await existing.json();
+          putBody.sha = existingData.sha;
+          putRes = await fetch(processedUrl, { method: 'PUT', headers, body: JSON.stringify(putBody) });
+        }
       }
     }
-    // Step 2: delete from {inbox}/ regardless of whether step 1 created or updated
+    // Step 2: delete from {inbox}/
     await fetch(
       `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${base}/${encodeURIComponent(inboxFile.name)}`,
       {
