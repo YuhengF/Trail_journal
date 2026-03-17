@@ -341,6 +341,14 @@ body {
 
 .detail-panel.open { transform: translateX(0); }
 
+/* hidden on desktop, shown only on mobile */
+.detail-drag-handle { display: none; }
+.map-drag-btn { display: none; }
+
+/* map drag mode: panel body becomes pass-through */
+.detail-panel.map-drag-mode .detail-body { pointer-events: none; opacity: 0.35; transition: opacity 0.2s; }
+.map-drag-btn.active { color: var(--accent) !important; border-color: var(--accent) !important; }
+
 .detail-header {
   padding: 20px; border-bottom: 1px solid var(--border);
   display: flex; justify-content: space-between; align-items: flex-start;
@@ -937,8 +945,32 @@ img.leaflet-tile { image-rendering: auto; }
   /* Map controls */
   .map-controls { top: 12px; right: 12px; }
 
-  /* Detail panel above tab bar */
-  .detail-panel { bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
+  /* Detail panel: bottom sheet exposing top 45% of screen for the map */
+  .detail-panel {
+    top: 45vh;
+    bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    left: 0; right: 0; width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -6px 24px rgba(0,0,0,0.12);
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    /* slide up from bottom on mobile instead of from the right */
+    transform: translateY(100%);
+  }
+  .detail-panel.open { transform: translateY(0); }
+  .detail-body { flex: 1; overflow-y: auto; min-height: 0; }
+
+  /* show drag handle + map pan button on mobile */
+  .detail-drag-handle {
+    display: block; flex-shrink: 0;
+    width: 36px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 10px auto 0;
+  }
+  .map-drag-btn { display: flex; align-items: center; justify-content: center; }
 
   /* Larger tap targets everywhere */
   .chip { font-size: 12px; padding: 6px 11px; }
@@ -1457,9 +1489,11 @@ img.leaflet-tile { image-rendering: auto; }
 
 <!-- DETAIL PANEL -->
 <div class="detail-panel" id="detailPanel">
+  <div class="detail-drag-handle"></div>
   <div class="detail-header">
     <h2 id="detailName"></h2>
     <div class="detail-actions">
+      <button class="map-drag-btn" id="mapDragBtn" onclick="toggleMapDragMode()" title="Move map">⊕</button>
       <button class="trim-track" onclick="openTrimModal()" id="detailTrimBtn" title="Trim track (remove start/end points)" style="display:none">✂</button>
       <button onclick="editTrail()" title="Edit">✎</button>
       <button class="delete" onclick="deleteTrail()" title="Delete">✕</button>
@@ -3062,7 +3096,16 @@ function focusTrail(id) {
   const layer = trailLayers[id];
   if (layer) {
     if (!savedMapView) savedMapView = { center: map.getCenter(), zoom: map.getZoom() };
-    map.fitBounds(layer.hitArea.getBounds(), { padding: [80, 80], maxZoom: 15 });
+    let fitOptions;
+    if (window.innerWidth <= 800) {
+      // On mobile the detail panel covers the bottom ~55% of screen (panel top = 45vh).
+      // Push the trail into the exposed top portion by using a large bottom padding.
+      const bottomPad = Math.round(window.innerHeight * 0.55) + 56;
+      fitOptions = { paddingTopLeft: [20, 40], paddingBottomRight: [20, bottomPad], maxZoom: 15 };
+    } else {
+      fitOptions = { padding: [80, 80], maxZoom: 15 };
+    }
+    map.fitBounds(layer.hitArea.getBounds(), fitOptions);
     Object.entries(trailLayers).forEach(([tid, l]) => {
       const f = tid === id;
       l.lines.forEach(x => x.setStyle({ opacity: f ? 1 : 0.15, weight: f ? 6 : 3 }));
@@ -5103,10 +5146,22 @@ function openDetail(id) {
 }
 
 function closeDetail() {
-  document.getElementById('detailPanel').classList.remove('open');
+  const panel = document.getElementById('detailPanel');
+  panel.classList.remove('open');
+  panel.classList.remove('map-drag-mode');
+  const dragBtn = document.getElementById('mapDragBtn');
+  if (dragBtn) dragBtn.classList.remove('active');
   selectedId = null; focusedTrailId = null;
   map.closePopup(); resetMapHighlight(); renderList();
   savedMapView = null; // Keep map where it is (on the trail), don't jump back to previous view
+}
+
+function toggleMapDragMode() {
+  const panel = document.getElementById('detailPanel');
+  const btn = document.getElementById('mapDragBtn');
+  const active = panel.classList.toggle('map-drag-mode');
+  btn.classList.toggle('active', active);
+  btn.title = active ? 'Lock panel' : 'Move map';
 }
 function editTrail() {
   const id = selectedId;
@@ -5344,7 +5399,13 @@ openPhotoDB().catch(e => console.warn('IndexedDB init failed:', e));
 loadTrails(); initMap();
 map.on('click', (e) => {
   if (drawMode) return;
-  if (document.getElementById('detailPanel').classList.contains('open')) {
+  const panel = document.getElementById('detailPanel');
+  // In map-drag mode a tap exits drag mode without closing the panel
+  if (panel.classList.contains('map-drag-mode')) {
+    toggleMapDragMode();
+    return;
+  }
+  if (panel.classList.contains('open')) {
     closeDetail();
   } else if (focusedTrailId) {
     focusedTrailId = null;
