@@ -2840,6 +2840,19 @@ window.addEventListener('online', () => {
   }
 });
 
+// Refresh inbox badge when user switches back to the app (e.g. after uploading via iPhone Shortcuts)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    refreshInboxBadge();
+  }
+});
+// Handle iOS bfcache restore (back-forward cache)
+window.addEventListener('pageshow', (e) => {
+  if (e.persisted) {
+    refreshInboxBadge();
+  }
+});
+
 // ===== FILTERING =====
 function getFilteredTrails() {
   const search = document.getElementById('searchInput').value.toLowerCase();
