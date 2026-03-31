@@ -4525,7 +4525,7 @@ function appendInboxContent(html) {
 
 async function listGitHubFolder(cfg, path) {
   const res = await fetch(
-    `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${path}`,
+    `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${path}?_=${Date.now()}`,
     { headers: { 'Authorization': `Bearer ${cfg.token}`, 'Accept': 'application/vnd.github.v3+json' }, cache: 'no-store' }
   );
   if (res.status === 404) return [];
@@ -5488,7 +5488,11 @@ document.getElementById('fTags').addEventListener('input', renderModalTagPicker)
 // Pull from GitHub on load (non-blocking)
 syncFromGitHub();
 // Check inbox for new files (non-blocking, updates badge + status bar)
+// Retry after delays to catch files still being uploaded by iPhone Shortcuts
+// (the shortcut may open the browser before the PUT upload finishes)
 refreshInboxBadge();
+setTimeout(refreshInboxBadge, 3000);
+setTimeout(refreshInboxBadge, 8000);
 </script>
 </body>
 </html>
