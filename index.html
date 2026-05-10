@@ -4831,7 +4831,7 @@ async function loadInboxToQueue() {
               b64 = btoa(unescape(encodeURIComponent(txt)));
             }
           }
-          archiveInboxFile({ name: file.name, sha: meta0.sha || file.sha, content: b64, inboxPath });
+          await archiveInboxFile({ name: file.name, sha: meta0.sha || file.sha, content: b64, inboxPath });
         }
         fetched++; continue;
       }
@@ -4892,9 +4892,8 @@ async function loadInboxToQueue() {
             saveData();
           }
         }
-        // Try to archive (move to inbox/processed/). If this fails (large file PUT, etc.), the file
-        // stays in inbox/ but the cheap filename dedup above will hide it from the badge & listing.
-        archiveInboxFile({ name: file.name, sha: meta.sha, content: base64, inboxPath });
+        // Archive synchronously so the modal doesn't close before the inbox/ DELETE completes.
+        await archiveInboxFile({ name: file.name, sha: meta.sha, content: base64, inboxPath });
         fetched++; continue;
       }
 
@@ -4954,10 +4953,10 @@ async function archiveInboxFile(inboxFile) {
   const base = 'inbox';
   const headers = { 'Authorization': `Bearer ${cfg.token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' };
 
-  // Step 1: copy to {inbox}/processed/. Skip if content is null (caller signaled already-archived).
-  // If the PUT fails for any reason (e.g. iOS rejects a >1 MB request body), we DO NOT delete from
-  // inbox/ — losing the file would prevent re-download. The cheap filename dedup hides it instead.
-  let copyOk = !inboxFile.content; // null content = skip copy step but still allow delete
+  // Best-effort copy to {inbox}/processed/. If this PUT fails (iOS Safari rejects multi-MB
+  // request bodies), the user's source app (Health Auto Export / Shortcut) can re-upload, so
+  // we do NOT block the delete on it. The user's actual complaint is the file persisting in
+  // inbox/, and the delete is what they're waiting for.
   if (inboxFile.content) {
     try {
       const processedUrl = `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${base}/processed/${encodeURIComponent(inboxFile.name)}`;
@@ -4968,28 +4967,37 @@ async function archiveInboxFile(inboxFile) {
         if (existing.ok) {
           const existingData = await existing.json();
           putBody.sha = existingData.sha;
-          putRes = await fetch(processedUrl, { method: 'PUT', headers, body: JSON.stringify(putBody) });
+          await fetch(processedUrl, { method: 'PUT', headers, body: JSON.stringify(putBody) });
         }
       }
-      copyOk = putRes.ok;
-      if (!copyOk) console.warn('archive PUT failed:', inboxFile.name, putRes.status);
     } catch (err) {
-      console.warn('archive PUT exception:', inboxFile.name, err);
-      copyOk = false;
+      console.warn('archive PUT failed (proceeding to delete anyway):', inboxFile.name, err);
     }
   }
 
-  // Step 2: delete from {inbox}/ only if the copy succeeded (or was skipped intentionally).
-  if (!copyOk) return;
+  // Always delete from inbox/. Refresh the SHA first to avoid 409 conflicts when the file was
+  // just re-uploaded by the iPhone Shortcut between listing and archive.
   try {
-    await fetch(
+    let sha = inboxFile.sha;
+    try {
+      const head = await fetch(
+        `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${base}/${encodeURIComponent(inboxFile.name)}`,
+        { headers, cache: 'no-store' }
+      );
+      if (head.ok) {
+        const j = await head.json();
+        if (j && j.sha) sha = j.sha;
+      }
+    } catch {}
+    const delRes = await fetch(
       `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${base}/${encodeURIComponent(inboxFile.name)}`,
       {
         method: 'DELETE',
         headers,
-        body: JSON.stringify({ message: `Remove from inbox after processing: ${inboxFile.name}`, sha: inboxFile.sha })
+        body: JSON.stringify({ message: `Remove from inbox after processing: ${inboxFile.name}`, sha })
       }
     );
+    if (!delRes.ok) console.warn('archive DELETE non-OK:', inboxFile.name, delRes.status);
   } catch (err) {
     console.warn('archive DELETE exception:', inboxFile.name, err);
   }
