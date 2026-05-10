@@ -3907,7 +3907,7 @@ document.querySelectorAll('.map-controls button[data-layer]').forEach(btn => {
 
 // ===== MODAL =====
 function openAddModal() {
-  editingId = null; gpxTrackData = null; gpxSpeedData = null; gpxTimesData = null; gpxElevData = null; gpxFilenameData = null; gpxFilenameData = null;
+  editingId = null; gpxTrackData = null; gpxSpeedData = null; gpxTimesData = null; gpxElevData = null; gpxFilenameData = null;
   batchQueue = []; batchCurrentIdx = -1; batchLastSavedTags = '';
   clearGpxPreview();
   document.getElementById('batchQueue').innerHTML = '';
@@ -4001,7 +4001,7 @@ async function saveTrail() {
     speedData: gpxSpeedData || (editingId ? (trails.find(x => x.id === editingId)?.speedData || null) : null),
     gpxElevations: gpxElevData || (editingId ? (trails.find(x => x.id === editingId)?.gpxElevations || null) : null),
     gpxTimes: timesArr,
-    gpxFilename: gpxFilenameData || (editingId ? (trails.find(x => x.id === editingId)?.gpxFilename || null) : null),
+    gpxFilenames: mergeTrailFilenames(editingId ? trails.find(x => x.id === editingId) : null, gpxFilenameData),
     timeRange: timeRangeFromTimes(timesArr, 0, timesArr ? timesArr.length : 0),
     updatedAt: Date.now()
   };
@@ -4447,7 +4447,7 @@ async function saveAllBatch() {
       speedData: item.gpxData.speedData,
       gpxElevations: item.gpxData.elevData,
       gpxTimes: timesArr,
-      gpxFilename: item.gpxData.filename || null,
+      gpxFilenames: item.gpxData.filename ? [item.gpxData.filename] : null,
       timeRange: timeRangeFromTimes(timesArr, 0, timesArr ? timesArr.length : 0),
       updatedAt: Date.now()
     });
@@ -4580,8 +4580,20 @@ function renderInboxFileList() {
 
 function getImportedFilenames() {
   const set = new Set();
-  trails.forEach(t => { if (t.gpxFilename) set.add(t.gpxFilename); });
+  trails.forEach(t => {
+    if (t.gpxFilename) set.add(t.gpxFilename);
+    if (Array.isArray(t.gpxFilenames)) t.gpxFilenames.forEach(n => n && set.add(n));
+  });
   return set;
+}
+
+// Merge a new filename into the trail's known filename list, dedup, preserving legacy gpxFilename.
+function mergeTrailFilenames(trail, newName) {
+  const set = new Set();
+  if (trail && trail.gpxFilename) set.add(trail.gpxFilename);
+  if (trail && Array.isArray(trail.gpxFilenames)) trail.gpxFilenames.forEach(n => n && set.add(n));
+  if (newName) set.add(newName);
+  return set.size ? [...set] : null;
 }
 
 function renderInboxStatus() {
@@ -4779,7 +4791,8 @@ async function loadInboxToQueue() {
 
       // Option C: content-duplicate check (date + distance match)
       if (skip && isContentDuplicate(r.startDate, r.distance, trailDateStr)) {
-        // Backfill gpxFilename onto the matched trail so future inbox refreshes use the cheap path.
+        // Always add this filename as an alias so the cheap dedup catches future Shortcut re-uploads
+        // (the Shortcut may use a different filename format than the original drag-drop import).
         const startMs = r.startDate && !isNaN(r.startDate.getTime()) ? r.startDate.getTime() : null;
         const matched = trails.find(t => {
           if (startMs && t.gpxTimes) {
@@ -4788,12 +4801,18 @@ async function loadInboxToQueue() {
           }
           return false;
         });
-        if (matched && !matched.gpxFilename) {
-          matched.gpxFilename = file.name;
-          matched.updatedAt = Date.now();
-          saveData();
+        if (matched) {
+          const merged = mergeTrailFilenames(matched, file.name);
+          const before = JSON.stringify(matched.gpxFilenames || null);
+          const after = JSON.stringify(merged);
+          if (before !== after) {
+            matched.gpxFilenames = merged;
+            matched.updatedAt = Date.now();
+            saveData();
+          }
         }
-        // Archive so it no longer appears in the inbox badge
+        // Try to archive (move to inbox/processed/). If this fails (large file PUT, etc.), the file
+        // stays in inbox/ but the cheap filename dedup above will hide it from the badge & listing.
         archiveInboxFile({ name: file.name, sha: meta.sha, content: base64, inboxPath });
         fetched++; continue;
       }
@@ -4853,14 +4872,17 @@ async function archiveInboxFile(inboxFile) {
   if (!cfg || !inboxFile) return;
   const base = 'inbox';
   const headers = { 'Authorization': `Bearer ${cfg.token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' };
-  try {
-    // Step 1: copy to {inbox}/processed/ (skip if content is null — already there)
-    if (inboxFile.content) {
+
+  // Step 1: copy to {inbox}/processed/. Skip if content is null (caller signaled already-archived).
+  // If the PUT fails for any reason (e.g. iOS rejects a >1 MB request body), we DO NOT delete from
+  // inbox/ — losing the file would prevent re-download. The cheap filename dedup hides it instead.
+  let copyOk = !inboxFile.content; // null content = skip copy step but still allow delete
+  if (inboxFile.content) {
+    try {
       const processedUrl = `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${base}/processed/${encodeURIComponent(inboxFile.name)}`;
       const putBody = { message: `Archive processed GPX: ${inboxFile.name}`, content: inboxFile.content };
       let putRes = await fetch(processedUrl, { method: 'PUT', headers, body: JSON.stringify(putBody) });
       if (!putRes.ok && putRes.status === 422) {
-        // File already exists in processed/ — fetch its SHA and overwrite
         const existing = await fetch(processedUrl, { headers });
         if (existing.ok) {
           const existingData = await existing.json();
@@ -4868,8 +4890,17 @@ async function archiveInboxFile(inboxFile) {
           putRes = await fetch(processedUrl, { method: 'PUT', headers, body: JSON.stringify(putBody) });
         }
       }
+      copyOk = putRes.ok;
+      if (!copyOk) console.warn('archive PUT failed:', inboxFile.name, putRes.status);
+    } catch (err) {
+      console.warn('archive PUT exception:', inboxFile.name, err);
+      copyOk = false;
     }
-    // Step 2: delete from {inbox}/
+  }
+
+  // Step 2: delete from {inbox}/ only if the copy succeeded (or was skipped intentionally).
+  if (!copyOk) return;
+  try {
     await fetch(
       `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${base}/${encodeURIComponent(inboxFile.name)}`,
       {
@@ -4879,7 +4910,7 @@ async function archiveInboxFile(inboxFile) {
       }
     );
   } catch (err) {
-    console.warn('archiveInboxFile failed for', inboxFile.name, err);
+    console.warn('archive DELETE exception:', inboxFile.name, err);
   }
 }
 
