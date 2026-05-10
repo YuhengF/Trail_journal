@@ -1753,7 +1753,7 @@ const STORAGE_KEY = 'trail_journal_data';
 const SYNC_CONFIG_KEY = 'trail_journal_sync';
 const TOMBSTONE_KEY = 'trail_journal_tombstones';
 let trails = [];
-let editingId = null, selectedId = null, currentRating = 0, gpxTrackData = null, gpxSpeedData = null, gpxTimesData = null, gpxElevData = null;
+let editingId = null, selectedId = null, currentRating = 0, gpxTrackData = null, gpxSpeedData = null, gpxTimesData = null, gpxElevData = null, gpxFilenameData = null;
 let batchQueue = [], batchCurrentIdx = -1, batchLastSavedTags = '';
 let trailsVisible = true, focusedTrailId = null, savedMapView = null;
 let syncPending = false;
@@ -2830,6 +2830,8 @@ function saveData() {
     updateSyncStatus('pending', 'Saving...');
     clearTimeout(syncTimer);
     syncTimer = setTimeout(() => syncToGitHub(), 2000);
+    // Newly-saved trails may match files in inbox/ — re-evaluate the badge.
+    if (typeof refreshInboxBadge === 'function') refreshInboxBadge();
   }
 }
 
@@ -3905,7 +3907,7 @@ document.querySelectorAll('.map-controls button[data-layer]').forEach(btn => {
 
 // ===== MODAL =====
 function openAddModal() {
-  editingId = null; gpxTrackData = null; gpxSpeedData = null; gpxTimesData = null; gpxElevData = null;
+  editingId = null; gpxTrackData = null; gpxSpeedData = null; gpxTimesData = null; gpxElevData = null; gpxFilenameData = null; gpxFilenameData = null;
   batchQueue = []; batchCurrentIdx = -1; batchLastSavedTags = '';
   clearGpxPreview();
   document.getElementById('batchQueue').innerHTML = '';
@@ -3924,7 +3926,7 @@ function openAddModal() {
 
 function openEditModal(id) {
   const t = trails.find(x => x.id===id); if (!t) return;
-  editingId = id; gpxTrackData = t.coords || null; gpxSpeedData = t.speedData || null; gpxTimesData = t.gpxTimes || null; gpxElevData = t.gpxElevations || null;
+  editingId = id; gpxTrackData = t.coords || null; gpxSpeedData = t.speedData || null; gpxTimesData = t.gpxTimes || null; gpxElevData = t.gpxElevations || null; gpxFilenameData = t.gpxFilename || null;
   batchQueue = []; batchCurrentIdx = -1; batchLastSavedTags = '';
   document.getElementById('batchQueue').innerHTML = '';
   document.getElementById('modalTitle').textContent = 'Edit Trail';
@@ -3999,6 +4001,7 @@ async function saveTrail() {
     speedData: gpxSpeedData || (editingId ? (trails.find(x => x.id === editingId)?.speedData || null) : null),
     gpxElevations: gpxElevData || (editingId ? (trails.find(x => x.id === editingId)?.gpxElevations || null) : null),
     gpxTimes: timesArr,
+    gpxFilename: gpxFilenameData || (editingId ? (trails.find(x => x.id === editingId)?.gpxFilename || null) : null),
     timeRange: timeRangeFromTimes(timesArr, 0, timesArr ? timesArr.length : 0),
     updatedAt: Date.now()
   };
@@ -4084,6 +4087,7 @@ function handleGPXFile(file) {
       gpxSpeedData = r.speedData || null;
       gpxTimesData = r.times || null;
       gpxElevData = (r.elevations && r.elevations.length === r.coords.length) ? r.elevations : null;
+      gpxFilenameData = file.name;
 
       const trailName = r.name || gpxFileBaseName(fileName);
       gpxAutoFill('fName', trailName);
@@ -4164,7 +4168,8 @@ function handleMultipleGPXFiles(files) {
             trackData: r.coords,
             speedData: r.speedData || null,
             timesData: r.times || null,
-            elevData: (r.elevations && r.elevations.length === r.coords.length) ? r.elevations : null
+            elevData: (r.elevations && r.elevations.length === r.coords.length) ? r.elevations : null,
+            filename: file.name
           },
           saved: false
         });
@@ -4214,7 +4219,8 @@ function addMoreBatchFiles() {
             gpxData: {
               trackData: r.coords, speedData: r.speedData || null,
               timesData: r.times || null,
-              elevData: (r.elevations && r.elevations.length === r.coords.length) ? r.elevations : null
+              elevData: (r.elevations && r.elevations.length === r.coords.length) ? r.elevations : null,
+              filename: file.name
             },
             saved: false
           });
@@ -4305,6 +4311,7 @@ function selectBatchItem(idx) {
   gpxSpeedData = item.gpxData.speedData;
   gpxTimesData = item.gpxData.timesData;
   gpxElevData = item.gpxData.elevData;
+  gpxFilenameData = item.gpxData.filename || null;
   const fs = item.formState;
   document.getElementById('fName').value = fs.name || '';
   document.getElementById('fDate').value = fs.date || '';
@@ -4406,7 +4413,7 @@ function clearBatchQueue() {
   gpxDrop.innerHTML = `<div>📂 Drop GPX files here or click to import</div><div style="font-size:10px;margin-top:4px;color:var(--text-muted)">Auto-fills track, distance & elevation · drop multiple to batch-import</div><input type="file" id="gpxFile" accept=".gpx" multiple>`;
   bindGpxInput();
   clearForm();
-  gpxTrackData = null; gpxSpeedData = null; gpxTimesData = null; gpxElevData = null;
+  gpxTrackData = null; gpxSpeedData = null; gpxTimesData = null; gpxElevData = null; gpxFilenameData = null;
   clearGpxPreview();
   document.getElementById('saveBtn').textContent = 'Save Trail';
   document.getElementById('fDate').value = toLocalDateStr(new Date());
@@ -4440,6 +4447,7 @@ async function saveAllBatch() {
       speedData: item.gpxData.speedData,
       gpxElevations: item.gpxData.elevData,
       gpxTimes: timesArr,
+      gpxFilename: item.gpxData.filename || null,
       timeRange: timeRangeFromTimes(timesArr, 0, timesArr ? timesArr.length : 0),
       updatedAt: Date.now()
     });
@@ -4561,6 +4569,7 @@ function renderInboxFileList() {
   h += `<span>Skip existing trails <span style="color:var(--text-muted);font-size:11px;">(already processed or matching a saved trail by date &amp; distance)</span></span>`;
   h += `</label></div>`;
   h += `<div id="inboxFileList" style="max-height:280px;overflow-y:auto;margin-bottom:14px;border:1px solid var(--border-light);border-radius:8px;"></div>`;
+  h += `<button class="btn" id="inboxCleanupBtn" onclick="cleanupImportedInboxFiles()" style="display:none;width:100%;margin-bottom:10px;font-size:12px;"></button>`;
   h += `<div style="display:flex;gap:8px;justify-content:flex-end;">`;
   h += `<button class="btn" onclick="closeInboxModal()">Cancel</button>`;
   h += `<button class="btn primary" id="inboxLoadBtn" onclick="loadInboxToQueue()">Load to Queue</button>`;
@@ -4569,18 +4578,33 @@ function renderInboxFileList() {
   renderInboxStatus();
 }
 
+function getImportedFilenames() {
+  const set = new Set();
+  trails.forEach(t => { if (t.gpxFilename) set.add(t.gpxFilename); });
+  return set;
+}
+
 function renderInboxStatus() {
   const skip = document.getElementById('inboxSkipExisting').checked;
+  const imported = getImportedFilenames();
   let listHtml = '';
   let toLoad = 0;
+  let importedCount = 0;
 
   inboxGpxFiles.forEach(file => {
-    if (skip && isInProcessed(file.name)) return; // hide processed files when skip is on
+    const isProcessed = isInProcessed(file.name);
+    const isImported = imported.has(file.name);
+    if (skip && (isProcessed || isImported)) {
+      if (isImported && !isProcessed) importedCount++;
+      return;
+    }
+    const status = isImported ? 'imported' : (isProcessed ? 'processed' : 'new');
+    const statusCls = isImported ? 'inbox-status-duplicate' : 'inbox-status-new';
     listHtml += `<div class="inbox-file-item">`;
     listHtml += `<span class="inbox-file-name">${escapeHtml(file.name)}</span>`;
-    listHtml += `<span class="inbox-file-status inbox-status-new">new</span>`;
+    listHtml += `<span class="inbox-file-status ${statusCls}">${status}</span>`;
     listHtml += `</div>`;
-    toLoad++;
+    if (!isImported && !isProcessed) toLoad++;
   });
 
   document.getElementById('inboxFileList').innerHTML = listHtml;
@@ -4589,6 +4613,56 @@ function renderInboxStatus() {
     btn.textContent = toLoad > 0 ? `Load ${toLoad} to Queue` : 'Nothing to Load';
     btn.disabled = toLoad === 0;
   }
+  const cleanBtn = document.getElementById('inboxCleanupBtn');
+  if (cleanBtn) {
+    if (importedCount > 0) {
+      cleanBtn.style.display = '';
+      cleanBtn.textContent = `Move ${importedCount} already-imported file${importedCount > 1 ? 's' : ''} to processed/`;
+      cleanBtn.disabled = false;
+    } else {
+      cleanBtn.style.display = 'none';
+    }
+  }
+}
+
+async function cleanupImportedInboxFiles() {
+  const cfg = getSyncConfig();
+  if (!cfg) return;
+  const imported = getImportedFilenames();
+  const targets = inboxGpxFiles.filter(f => imported.has(f.name) && !isInProcessed(f.name));
+  if (!targets.length) return;
+  const btn = document.getElementById('inboxCleanupBtn');
+  if (btn) { btn.disabled = true; btn.textContent = `Archiving 0/${targets.length}...`; }
+  let done = 0;
+  for (const f of targets) {
+    try {
+      // Fetch content so we can copy to processed/ before deleting from inbox/.
+      const res = await fetch(
+        `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/inbox/${encodeURIComponent(f.name)}`,
+        { headers: { 'Authorization': `Bearer ${cfg.token}`, 'Accept': 'application/vnd.github.v3+json' }, cache: 'no-store' }
+      );
+      if (res.ok) {
+        const meta = await res.json();
+        let base64 = null;
+        if (meta.content) {
+          base64 = meta.content.replace(/\s/g, '');
+        } else if (meta.download_url) {
+          const rawRes = await fetch(meta.download_url, {
+            headers: { 'Authorization': `Bearer ${cfg.token}` }, cache: 'no-store'
+          });
+          if (rawRes.ok) {
+            const text = await rawRes.text();
+            base64 = btoa(unescape(encodeURIComponent(text)));
+          }
+        }
+        await archiveInboxFile({ name: f.name, sha: meta.sha || f.sha, content: base64, inboxPath: 'inbox' });
+      }
+    } catch (err) { console.warn('cleanup failed for', f.name, err); }
+    done++;
+    if (btn) btn.textContent = `Archiving ${done}/${targets.length}...`;
+  }
+  await reloadInbox();
+  refreshInboxBadge();
 }
 
 function escapeHtml(str) {
@@ -4641,9 +4715,34 @@ async function loadInboxToQueue() {
 
   const inboxPath = 'inbox';
 
+  const importedNames = getImportedFilenames();
+
   for (const file of filesToFetch) {
     btn.textContent = `Loading... ${fetched + 1}/${filesToFetch.length}`;
     try {
+      // Cheap dedup: filename matches a saved trail's gpxFilename. Archive without re-parsing.
+      if (skip && importedNames.has(file.name)) {
+        const res0 = await fetch(
+          `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${inboxPath}/${encodeURIComponent(file.name)}`,
+          { headers: { 'Authorization': `Bearer ${cfg.token}`, 'Accept': 'application/vnd.github.v3+json' }, cache: 'no-store' }
+        );
+        if (res0.ok) {
+          const meta0 = await res0.json();
+          let b64 = null;
+          if (meta0.content) {
+            b64 = meta0.content.replace(/\s/g, '');
+          } else if (meta0.download_url) {
+            const raw0 = await fetch(meta0.download_url, { headers: { 'Authorization': `Bearer ${cfg.token}` }, cache: 'no-store' });
+            if (raw0.ok) {
+              const txt = await raw0.text();
+              b64 = btoa(unescape(encodeURIComponent(txt)));
+            }
+          }
+          archiveInboxFile({ name: file.name, sha: meta0.sha || file.sha, content: b64, inboxPath });
+        }
+        fetched++; continue;
+      }
+
       const res = await fetch(
         `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${inboxPath}/${encodeURIComponent(file.name)}`,
         { headers: { 'Authorization': `Bearer ${cfg.token}`, 'Accept': 'application/vnd.github.v3+json' }, cache: 'no-store' }
@@ -4680,6 +4779,20 @@ async function loadInboxToQueue() {
 
       // Option C: content-duplicate check (date + distance match)
       if (skip && isContentDuplicate(r.startDate, r.distance, trailDateStr)) {
+        // Backfill gpxFilename onto the matched trail so future inbox refreshes use the cheap path.
+        const startMs = r.startDate && !isNaN(r.startDate.getTime()) ? r.startDate.getTime() : null;
+        const matched = trails.find(t => {
+          if (startMs && t.gpxTimes) {
+            const firstTs = (Array.isArray(t.gpxTimes) ? t.gpxTimes : []).find(ts => ts !== null && !isNaN(ts));
+            if (firstTs === startMs) return true;
+          }
+          return false;
+        });
+        if (matched && !matched.gpxFilename) {
+          matched.gpxFilename = file.name;
+          matched.updatedAt = Date.now();
+          saveData();
+        }
         // Archive so it no longer appears in the inbox badge
         archiveInboxFile({ name: file.name, sha: meta.sha, content: base64, inboxPath });
         fetched++; continue;
@@ -4697,7 +4810,8 @@ async function loadInboxToQueue() {
         gpxData: {
           trackData: r.coords, speedData: r.speedData || null,
           timesData: r.times || null,
-          elevData: (r.elevations && r.elevations.length === r.coords.length) ? r.elevations : null
+          elevData: (r.elevations && r.elevations.length === r.coords.length) ? r.elevations : null,
+          filename: file.name
         },
         saved: false,
         inboxFile: { name: file.name, sha: meta.sha, content: base64, inboxPath }
@@ -4714,7 +4828,7 @@ async function loadInboxToQueue() {
   }
 
   // Set up the add modal manually to avoid openAddModal() resetting batchQueue
-  editingId = null; gpxTrackData = null; gpxSpeedData = null; gpxTimesData = null; gpxElevData = null;
+  editingId = null; gpxTrackData = null; gpxSpeedData = null; gpxTimesData = null; gpxElevData = null; gpxFilenameData = null;
   batchCurrentIdx = -1; batchLastSavedTags = '';
   clearGpxPreview();
   document.getElementById('modalTitle').textContent = 'Add Trail';
@@ -4781,7 +4895,8 @@ async function refreshInboxBadge() {
       listGitHubFolder(cfg, 'inbox/processed').catch(() => [])
     ]);
     const processed = new Set(processedFiles.filter(f => f.type === 'file').map(f => f.name));
-    inboxNewCount = allFiles.filter(f => f.type === 'file' && !f.name.startsWith('.') && !processed.has(f.name)).length;
+    const imported = getImportedFilenames();
+    inboxNewCount = allFiles.filter(f => f.type === 'file' && !f.name.startsWith('.') && !processed.has(f.name) && !imported.has(f.name)).length;
     updateInboxStatus();
   } catch { /* silently ignore */ }
 }
@@ -4963,7 +5078,8 @@ async function loadPopularToQueue() {
         gpxData: {
           trackData: r.coords, speedData: r.speedData || null,
           timesData: r.times || null,
-          elevData: (r.elevations && r.elevations.length === r.coords.length) ? r.elevations : null
+          elevData: (r.elevations && r.elevations.length === r.coords.length) ? r.elevations : null,
+          filename: file.name
         },
         saved: false
       });
@@ -4976,7 +5092,7 @@ async function loadPopularToQueue() {
     return;
   }
   // Open add modal (same pattern as loadInboxToQueue)
-  editingId = null; gpxTrackData = null; gpxSpeedData = null; gpxTimesData = null; gpxElevData = null;
+  editingId = null; gpxTrackData = null; gpxSpeedData = null; gpxTimesData = null; gpxElevData = null; gpxFilenameData = null;
   batchCurrentIdx = -1; batchLastSavedTags = '';
   clearGpxPreview();
   document.getElementById('modalTitle').textContent = 'Add Trail';
@@ -5020,7 +5136,7 @@ function startDrawMode() {
     notes: document.getElementById('fNotes').value,
     photos: [...formPhotos],
     coords: document.getElementById('fCoords').value,
-    gpxTrackData, gpxSpeedData, gpxTimesData, gpxElevData
+    gpxTrackData, gpxSpeedData, gpxTimesData, gpxElevData, gpxFilenameData
   };
 
   const existing = document.getElementById('fCoords').value.trim();
@@ -5135,6 +5251,7 @@ function restoreFormState() {
   gpxSpeedData = s.gpxSpeedData;
   gpxTimesData = s.gpxTimesData;
   gpxElevData = s.gpxElevData;
+  gpxFilenameData = s.gpxFilenameData || null;
   document.getElementById('modalTitle').textContent = editingId ? 'Edit Trail' : 'Add Trail';
   document.getElementById('saveBtn').textContent = editingId ? 'Update Trail' : 'Save Trail';
   renderModalTagPicker();
@@ -5151,6 +5268,7 @@ function finishDrawing() {
   gpxSpeedData = null;
   gpxTimesData = null;
   gpxElevData = null;
+  gpxFilenameData = null;
   gpxAutoFill('fDistance', dist, true);
   document.getElementById('gpxDrop').innerHTML = `<div style="color:var(--green)">✓ Drawn track — ${coords.length} points, ${dist} mi</div>`;
   document.getElementById('modalOverlay').classList.add('open');
