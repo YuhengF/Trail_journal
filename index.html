@@ -4587,6 +4587,80 @@ function getImportedFilenames() {
   return set;
 }
 
+// Trail GPX start timestamps, used to match inbox files by filename-embedded timestamp.
+function getImportedStartTimes() {
+  const list = [];
+  trails.forEach(t => {
+    if (!t.gpxTimes) return;
+    const arr = Array.isArray(t.gpxTimes) ? t.gpxTimes : [];
+    const first = arr.find(x => x !== null && !isNaN(x));
+    if (first) list.push({ ts: first, trail: t });
+  });
+  return list;
+}
+
+// Extract a wall-clock timestamp from common GPX filename patterns. Returns both local-time and
+// UTC interpretations because some sources name files in local time and some in UTC.
+// Examples matched: "Hiking-Route-2026-05-09 14:41:17", "HikingRoute20260509_14_41_17".
+function extractGpxFilenameTimestamps(filename) {
+  if (!filename) return null;
+  let parts = null;
+  let m = filename.match(/(\d{4})-(\d{2})-(\d{2})[\sT_-](\d{2})[:_-](\d{2})[:_-](\d{2})/);
+  if (m) parts = m;
+  else {
+    m = filename.match(/(\d{4})(\d{2})(\d{2})[T_\s-]?(\d{2})[:_-]?(\d{2})[:_-]?(\d{2})/);
+    if (m) parts = m;
+  }
+  if (!parts) return null;
+  const Y = +parts[1], Mo = +parts[2] - 1, D = +parts[3], h = +parts[4], mi = +parts[5], s = +parts[6];
+  return [
+    new Date(Y, Mo, D, h, mi, s).getTime(),
+    Date.UTC(Y, Mo, D, h, mi, s)
+  ];
+}
+
+// 5-minute tolerance covers second-rounding without colliding with separate same-day hikes.
+const FILENAME_TS_TOLERANCE_MS = 5 * 60 * 1000;
+
+function inboxFileMatchesImported(filename, importedNames, startTimes) {
+  if (importedNames.has(filename)) return true;
+  const candidates = extractGpxFilenameTimestamps(filename);
+  if (!candidates) return false;
+  for (const { ts: st } of startTimes) {
+    for (const c of candidates) {
+      if (Math.abs(st - c) < FILENAME_TS_TOLERANCE_MS) return true;
+    }
+  }
+  return false;
+}
+
+function findTrailByFilenameTimestamp(filename, startTimes) {
+  const candidates = extractGpxFilenameTimestamps(filename);
+  if (!candidates) return null;
+  let best = null, bestDelta = Infinity;
+  for (const { ts: st, trail } of startTimes) {
+    for (const c of candidates) {
+      const delta = Math.abs(st - c);
+      if (delta < FILENAME_TS_TOLERANCE_MS && delta < bestDelta) { best = trail; bestDelta = delta; }
+    }
+  }
+  return best;
+}
+
+function backfillFilenameFromTimestamp(file) {
+  const startTimes = getImportedStartTimes();
+  const matched = findTrailByFilenameTimestamp(file.name, startTimes);
+  if (!matched) return false;
+  const merged = mergeTrailFilenames(matched, file.name);
+  const before = JSON.stringify(matched.gpxFilenames || null);
+  const after = JSON.stringify(merged);
+  if (before === after) return false;
+  matched.gpxFilenames = merged;
+  matched.updatedAt = Date.now();
+  saveData();
+  return true;
+}
+
 // Merge a new filename into the trail's known filename list, dedup, preserving legacy gpxFilename.
 function mergeTrailFilenames(trail, newName) {
   const set = new Set();
@@ -4598,14 +4672,17 @@ function mergeTrailFilenames(trail, newName) {
 
 function renderInboxStatus() {
   const skip = document.getElementById('inboxSkipExisting').checked;
+  // Backfill any filename-timestamp matches before rendering so they show as "imported".
+  inboxGpxFiles.forEach(f => { if (!isInProcessed(f.name)) backfillFilenameFromTimestamp(f); });
   const imported = getImportedFilenames();
+  const startTimes = getImportedStartTimes();
   let listHtml = '';
   let toLoad = 0;
   let importedCount = 0;
 
   inboxGpxFiles.forEach(file => {
     const isProcessed = isInProcessed(file.name);
-    const isImported = imported.has(file.name);
+    const isImported = inboxFileMatchesImported(file.name, imported, startTimes);
     if (skip && (isProcessed || isImported)) {
       if (isImported && !isProcessed) importedCount++;
       return;
@@ -4641,7 +4718,8 @@ async function cleanupImportedInboxFiles() {
   const cfg = getSyncConfig();
   if (!cfg) return;
   const imported = getImportedFilenames();
-  const targets = inboxGpxFiles.filter(f => imported.has(f.name) && !isInProcessed(f.name));
+  const startTimes = getImportedStartTimes();
+  const targets = inboxGpxFiles.filter(f => inboxFileMatchesImported(f.name, imported, startTimes) && !isInProcessed(f.name));
   if (!targets.length) return;
   const btn = document.getElementById('inboxCleanupBtn');
   if (btn) { btn.disabled = true; btn.textContent = `Archiving 0/${targets.length}...`; }
@@ -4727,13 +4805,16 @@ async function loadInboxToQueue() {
 
   const inboxPath = 'inbox';
 
+  // Backfill filename aliases from timestamp matches before iterating, so the cheap branch hits.
+  filesToFetch.forEach(f => backfillFilenameFromTimestamp(f));
   const importedNames = getImportedFilenames();
+  const startTimes = getImportedStartTimes();
 
   for (const file of filesToFetch) {
     btn.textContent = `Loading... ${fetched + 1}/${filesToFetch.length}`;
     try {
-      // Cheap dedup: filename matches a saved trail's gpxFilename. Archive without re-parsing.
-      if (skip && importedNames.has(file.name)) {
+      // Cheap dedup: filename match (exact or by embedded timestamp). Archive without re-parsing.
+      if (skip && inboxFileMatchesImported(file.name, importedNames, startTimes)) {
         const res0 = await fetch(
           `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${inboxPath}/${encodeURIComponent(file.name)}`,
           { headers: { 'Authorization': `Bearer ${cfg.token}`, 'Accept': 'application/vnd.github.v3+json' }, cache: 'no-store' }
@@ -4927,7 +5008,16 @@ async function refreshInboxBadge() {
     ]);
     const processed = new Set(processedFiles.filter(f => f.type === 'file').map(f => f.name));
     const imported = getImportedFilenames();
-    inboxNewCount = allFiles.filter(f => f.type === 'file' && !f.name.startsWith('.') && !processed.has(f.name) && !imported.has(f.name)).length;
+    const startTimes = getImportedStartTimes();
+    // Backfill matched filenames onto trails so subsequent passes hit the cheap filename Set.
+    let backfilled = false;
+    allFiles.filter(f => f.type === 'file' && !f.name.startsWith('.') && !processed.has(f.name) && !imported.has(f.name))
+      .forEach(f => { if (backfillFilenameFromTimestamp(f)) backfilled = true; });
+    const importedAfter = backfilled ? getImportedFilenames() : imported;
+    inboxNewCount = allFiles.filter(f =>
+      f.type === 'file' && !f.name.startsWith('.') &&
+      !processed.has(f.name) && !inboxFileMatchesImported(f.name, importedAfter, startTimes)
+    ).length;
     updateInboxStatus();
   } catch { /* silently ignore */ }
 }
