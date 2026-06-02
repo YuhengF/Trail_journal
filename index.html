@@ -4779,11 +4779,16 @@ function isContentDuplicate(startDate, distance, dateStr) {
       return firstTs === startMs;
     })) return true;
   }
-  // Fallback for older trails with no gpxTimes: date + distance ≈ match
+  // Fallback for older trails with no gpxTimes: date + distance ≈ match.
+  // Only apply to trails that lack a usable start timestamp — if a trail DOES have
+  // gpxTimes, the exact-timestamp check above already ruled it out, so fuzzy-matching
+  // against it here would falsely reject a genuinely new same-day hike of similar distance.
   if (!dateStr) return false;
   const dist = parseFloat(distance);
   return trails.some(t => {
     if (t.date !== dateStr) return false;
+    const hasStart = Array.isArray(t.gpxTimes) && t.gpxTimes.some(ts => ts !== null && !isNaN(ts));
+    if (hasStart) return false;
     const td = parseFloat(t.distance);
     return !isNaN(td) && !isNaN(dist) && Math.abs(td - dist) < 0.2;
   });
