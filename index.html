@@ -4464,6 +4464,11 @@ async function saveAllBatch() {
 let inboxGpxFiles = [];
 let inboxProcessedNames = new Set();
 let inboxAllFiles = [];
+// Parsed GPX summary per inbox file (keyed by name@sha) so the modal's "new" status reflects
+// the SAME content-dedup the importer applies. Values: {startDate, distance, dateStr} on success,
+// null if the file couldn't be parsed (the importer would skip it too), undefined = not yet checked.
+let inboxParsedCache = {};
+let inboxParseCfg = null;
 
 function openInboxModal() {
   const cfg = getSyncConfig();
@@ -4519,6 +4524,9 @@ async function fetchAndRenderInbox(cfg, inboxPath) {
     }
 
     renderInboxFileList();
+    // Parse file contents in the background so the per-row status reflects what the importer
+    // will actually do (content dedup + parse failures), then re-render as results arrive.
+    ensureInboxParsed(cfg);
   } catch (err) {
     if (msgEl) msgEl.innerHTML = `<span style="color:#c0392b">Error: ${escapeHtml(err.message)}</span>`;
   }
@@ -4670,6 +4678,77 @@ function mergeTrailFilenames(trail, newName) {
   return set.size ? [...set] : null;
 }
 
+// Fetch + parse each not-yet-known inbox file so renderInboxStatus can apply the same
+// content-dedup (and parse-failure handling) the importer uses. Re-renders incrementally as
+// each file resolves. Files already matched by filename/timestamp are skipped (no fetch needed).
+async function ensureInboxParsed(cfg) {
+  inboxParseCfg = cfg;
+  const inboxPath = 'inbox';
+  const imported = getImportedFilenames();
+  const startTimes = getImportedStartTimes();
+  for (const file of inboxGpxFiles) {
+    if (isInProcessed(file.name)) continue;
+    if (inboxFileMatchesImported(file.name, imported, startTimes)) continue;
+    const key = file.name + '@' + file.sha;
+    if (key in inboxParsedCache) continue;
+    let summary = null;
+    try {
+      const res = await fetch(
+        `https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${inboxPath}/${encodeURIComponent(file.name)}`,
+        { headers: { 'Authorization': `Bearer ${cfg.token}`, 'Accept': 'application/vnd.github.v3+json' }, cache: 'no-store' }
+      );
+      if (res.ok) {
+        const meta = await res.json();
+        let xmlStr = null;
+        if (meta.content) {
+          xmlStr = decodeURIComponent(escape(atob(meta.content.replace(/\s/g, ''))));
+        } else if (meta.download_url) {
+          const rawRes = await fetch(meta.download_url, { headers: { 'Authorization': `Bearer ${cfg.token}` }, cache: 'no-store' });
+          if (rawRes.ok) xmlStr = await rawRes.text();
+        }
+        if (xmlStr) {
+          const r = parseGPX(xmlStr); // throws on unparseable GPX -> caught -> null
+          const baseName = file.name.replace(/\.gpx$/i, '');
+          let dateStr = null;
+          if (r.startDate && !isNaN(r.startDate.getTime())) dateStr = toLocalDateStr(r.startDate);
+          if (!dateStr) {
+            const m = baseName.match(/(\d{4}-\d{2}-\d{2})/);
+            dateStr = m ? m[1] : toLocalDateStr(new Date());
+          }
+          summary = { startDate: r.startDate || null, distance: r.distance || '', dateStr };
+        }
+      }
+    } catch { summary = null; }
+    inboxParsedCache[key] = summary;
+    // Only refresh if the modal is still open.
+    if (document.getElementById('inboxFileList')) renderInboxStatus();
+  }
+}
+
+// Mirror the importer's per-file decision (filename match -> content dup -> parse failure).
+// Returns { status, loadable } where loadable === true means loadInboxToQueue would queue it.
+function classifyInboxFile(file, imported, startTimes, skip) {
+  const processed = isInProcessed(file.name);
+  const filenameDup = inboxFileMatchesImported(file.name, imported, startTimes);
+  const key = file.name + '@' + file.sha;
+  // With "skip existing" off, the importer applies no dedup — it queues every file that
+  // fetches and parses. Filename-matched files aren't pre-parsed here, but they imported fine
+  // before, so treat them as loadable.
+  if (!skip) {
+    if (filenameDup) return { status: processed ? 'processed' : 'imported', loadable: true };
+    if (!(key in inboxParsedCache)) return { status: 'checking', loadable: false, pending: true };
+    if (!inboxParsedCache[key]) return { status: 'unreadable', loadable: false };
+    return { status: processed ? 'processed' : 'new', loadable: true };
+  }
+  if (processed) return { status: 'processed', loadable: false };
+  if (filenameDup) return { status: 'imported', loadable: false };
+  if (!(key in inboxParsedCache)) return { status: 'checking', loadable: false, pending: true };
+  const p = inboxParsedCache[key];
+  if (!p) return { status: 'unreadable', loadable: false };
+  if (isContentDuplicate(p.startDate, p.distance, p.dateStr)) return { status: 'imported', loadable: false };
+  return { status: 'new', loadable: true };
+}
+
 function renderInboxStatus() {
   const skip = document.getElementById('inboxSkipExisting').checked;
   // Backfill any filename-timestamp matches before rendering so they show as "imported".
@@ -4679,28 +4758,37 @@ function renderInboxStatus() {
   let listHtml = '';
   let toLoad = 0;
   let importedCount = 0;
+  let pending = 0;
 
   inboxGpxFiles.forEach(file => {
-    const isProcessed = isInProcessed(file.name);
-    const isImported = inboxFileMatchesImported(file.name, imported, startTimes);
-    if (skip && (isProcessed || isImported)) {
-      if (isImported && !isProcessed) importedCount++;
+    const { status, loadable, pending: isPending } = classifyInboxFile(file, imported, startTimes, skip);
+    if (isPending) pending++;
+    // When skipping existing, hide rows the importer won't queue (processed/imported), but keep
+    // showing "checking" and "unreadable" so the count never silently disagrees with the result.
+    if (skip && (status === 'processed' || status === 'imported')) {
+      if (status === 'imported') importedCount++;
       return;
     }
-    const status = isImported ? 'imported' : (isProcessed ? 'processed' : 'new');
-    const statusCls = isImported ? 'inbox-status-duplicate' : 'inbox-status-new';
+    const statusCls = status === 'new' ? 'inbox-status-new'
+      : status === 'imported' ? 'inbox-status-duplicate'
+      : 'inbox-status-skipped';
     listHtml += `<div class="inbox-file-item">`;
     listHtml += `<span class="inbox-file-name">${escapeHtml(file.name)}</span>`;
     listHtml += `<span class="inbox-file-status ${statusCls}">${status}</span>`;
     listHtml += `</div>`;
-    if (!isImported && !isProcessed) toLoad++;
+    if (loadable) toLoad++;
   });
 
   document.getElementById('inboxFileList').innerHTML = listHtml;
   const btn = document.getElementById('inboxLoadBtn');
   if (btn) {
-    btn.textContent = toLoad > 0 ? `Load ${toLoad} to Queue` : 'Nothing to Load';
-    btn.disabled = toLoad === 0;
+    if (pending > 0) {
+      btn.textContent = 'Checking files…';
+      btn.disabled = true;
+    } else {
+      btn.textContent = toLoad > 0 ? `Load ${toLoad} to Queue` : 'Nothing to Load';
+      btn.disabled = toLoad === 0;
+    }
   }
   const cleanBtn = document.getElementById('inboxCleanupBtn');
   if (cleanBtn) {
@@ -4719,7 +4807,8 @@ async function cleanupImportedInboxFiles() {
   if (!cfg) return;
   const imported = getImportedFilenames();
   const startTimes = getImportedStartTimes();
-  const targets = inboxGpxFiles.filter(f => inboxFileMatchesImported(f.name, imported, startTimes) && !isInProcessed(f.name));
+  // Match what renderInboxStatus counts as "imported" (filename match OR content duplicate).
+  const targets = inboxGpxFiles.filter(f => classifyInboxFile(f, imported, startTimes, true).status === 'imported' && !isInProcessed(f.name));
   if (!targets.length) return;
   const btn = document.getElementById('inboxCleanupBtn');
   if (btn) { btn.disabled = true; btn.textContent = `Archiving 0/${targets.length}...`; }
